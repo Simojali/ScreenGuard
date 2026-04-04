@@ -1,0 +1,29 @@
+# Dependencies
+node_modules/
+
+# Build outputs
+out/
+dist/
+
+# Electron builder cache
+.electron-builder-cache/
+
+# Vite cache
+.vite/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+npm-debug.log*
+
+# Local env files
+.env
+.env.local
+
+# Editor
+.vscode/
+*.suo
+*.user

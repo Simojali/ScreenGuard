@@ -1,0 +1,21 @@
+appId: com.screenguard.app
+productName: ScreenGuard
+copyright: Copyright © 2024
+directories:
+  buildResources: resources
+  output: dist
+files:
+  - out/**/*
+  - resources/**/*
+win:
+  target:
+    - target: nsis
+      arch:
+        - x64
+  icon: resources/tray-icon.png
+nsis:
+  oneClick: false
+  allowToChangeInstallationDirectory: true
+  createDesktopShortcut: true
+  createStartMenuShortcut: true
+afterPack: scripts/afterPack.js

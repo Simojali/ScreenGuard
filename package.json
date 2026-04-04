@@ -1,0 +1,35 @@
+{
+  "name": "screenguard",
+  "version": "1.0.0",
+  "description": "ScreenGuard — Windows screen time tracker",
+  "main": "out/main/index.js",
+  "scripts": {
+    "dev": "electron-vite dev",
+    "dev:renderer": "vite serve src/renderer --port 5180 --config electron.vite.config.ts",
+    "build": "electron-vite build",
+    "preview": "electron-vite preview",
+    "package": "npm run build && electron-builder",
+    "rebuild": "echo No native modules to rebuild"
+  },
+  "dependencies": {
+    "date-fns": "^3.6.0",
+    "lucide-react": "^0.378.0",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "react-router-dom": "^6.23.0",
+    "recharts": "^2.12.7",
+    "sql.js": "^1.14.1",
+    "zustand": "^4.5.2"
+  },
+  "devDependencies": {
+    "@electron/rebuild": "^3.6.0",
+    "@types/react": "^18.3.1",
+    "@types/react-dom": "^18.3.0",
+    "@vitejs/plugin-react": "^4.2.1",
+    "electron": "^30.0.1",
+    "electron-builder": "^24.13.3",
+    "electron-vite": "^2.1.0",
+    "typescript": "^5.4.5",
+    "vite": "^5.2.11"
+  }
+}
