@@ -1,7 +1,7 @@
 import { app, BrowserWindow, powerMonitor } from 'electron'
 import path from 'path'
 import { initDatabase } from './db/database'
-import { startTracker, stopTracker } from './modules/tracker'
+import { startTracker, stopTracker, setIdleConfig } from './modules/tracker'
 import { startLimiter, stopLimiter } from './modules/limiter'
 import { startDowntime, stopDowntime } from './modules/downtime'
 import { setupTray } from './modules/tray'
@@ -49,12 +49,15 @@ app.whenReady().then(async () => {
   // Enable Windows toast notifications
   app.setAppUserModelId('com.screenguard.app')
 
-  // Auto-start with Windows (only in production)
-  if (process.env['NODE_ENV'] !== 'development') {
-    app.setLoginItemSettings({ openAtLogin: true, openAsHidden: true })
-  }
-
   const db = await initDatabase()
+
+  // Apply saved settings
+  const getSetting = (key: string) =>
+    (db.prepare('SELECT value FROM settings WHERE key = ?').get(key) as { value: string } | undefined)?.value
+
+  const idleEnabled = getSetting('idle_enabled') !== 'false'
+  const idleThresholdMinutes = parseInt(getSetting('idle_threshold_minutes') ?? '5', 10)
+  setIdleConfig(idleEnabled, idleThresholdMinutes)
   mainWindow = createWindow()
 
   setupTray(mainWindow)

@@ -47,9 +47,16 @@ export const ipc = {
     invoke<{ success: boolean }>('setCategoryLabel', categoryId, label),
   resetCategoryLabel: (categoryId: string) =>
     invoke<{ success: boolean }>('resetCategoryLabel', categoryId),
+
+  // Settings
+  getSettings: () => invoke<Record<string, string>>('getSettings'),
+  setSetting: (key: string, value: string) => invoke<{ success: boolean }>('setSetting', key, value),
+  getStartupEnabled: () => invoke<boolean>('getStartupEnabled'),
+  setStartupEnabled: (enabled: boolean) => invoke<{ success: boolean }>('setStartupEnabled', enabled),
+  clearHistory: () => invoke<{ success: boolean }>('clearHistory'),
 }
 
-type SessionUpdateCallback = (data: { appName: string; todayTotalMs: number }) => void
+type SessionUpdateCallback = (data: { appName: string; todayTotalMs: number; isIdle: boolean }) => void
 type BreachCallback = (data: { appName: string; action: string }) => void
 
 export function onSessionUpdate(cb: SessionUpdateCallback): () => void {

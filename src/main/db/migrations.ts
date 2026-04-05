@@ -68,5 +68,17 @@ export const migrations = [
     category_id TEXT PRIMARY KEY,
     label       TEXT NOT NULL
   );
+  `,
+
+  // v3 — user settings
+  `
+  CREATE TABLE IF NOT EXISTS settings (
+    key   TEXT PRIMARY KEY,
+    value TEXT NOT NULL
+  );
+  INSERT OR IGNORE INTO settings (key, value) VALUES
+    ('idle_enabled', 'true'),
+    ('idle_threshold_minutes', '5'),
+    ('launch_at_startup', 'false');
   `
 ]

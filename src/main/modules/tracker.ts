@@ -10,6 +10,14 @@ const FLUSH_INTERVAL_MS = 30000
 /** Seconds of no keyboard/mouse input before we stop counting screen time */
 const IDLE_THRESHOLD_SECONDS = 5 * 60  // 5 minutes
 
+let idleEnabled = true
+let idleThresholdSec = IDLE_THRESHOLD_SECONDS
+
+export function setIdleConfig(enabled: boolean, thresholdMinutes: number): void {
+  idleEnabled = enabled
+  idleThresholdSec = thresholdMinutes * 60
+}
+
 interface ActiveSession {
   appName: string
   exePath: string
@@ -71,7 +79,7 @@ async function pollActiveWindow(): Promise<void> {
     // If the user hasn't touched keyboard or mouse for IDLE_THRESHOLD_SECONDS,
     // don't count this time against any app.
     const idleSeconds = powerMonitor.getSystemIdleTime()
-    const isIdle = idleSeconds >= IDLE_THRESHOLD_SECONDS
+    const isIdle = idleEnabled && idleSeconds >= idleThresholdSec
 
     const newAppName = info.name  // already has .exe from windowTracker
     const newExePath = info.path

@@ -88,11 +88,23 @@ const api = {
   resetCategoryLabel: (categoryId: string): Promise<{ success: boolean }> =>
     ipcRenderer.invoke('categories:reset-label', { categoryId }),
 
+  // Settings
+  getSettings: (): Promise<Record<string, string>> =>
+    ipcRenderer.invoke('settings:get-all'),
+  setSetting: (key: string, value: string): Promise<{ success: boolean }> =>
+    ipcRenderer.invoke('settings:set', { key, value }),
+  getStartupEnabled: (): Promise<boolean> =>
+    ipcRenderer.invoke('settings:get-startup'),
+  setStartupEnabled: (enabled: boolean): Promise<{ success: boolean }> =>
+    ipcRenderer.invoke('settings:set-startup', { enabled }),
+  clearHistory: (): Promise<{ success: boolean }> =>
+    ipcRenderer.invoke('settings:clear-history'),
+
   // Push event listeners
   onSessionUpdate: (
-    callback: (data: { appName: string; todayTotalMs: number }) => void
+    callback: (data: { appName: string; todayTotalMs: number; isIdle: boolean }) => void
   ) => {
-    const handler = (_event: Electron.IpcRendererEvent, data: { appName: string; todayTotalMs: number }) =>
+    const handler = (_event: Electron.IpcRendererEvent, data: { appName: string; todayTotalMs: number; isIdle: boolean }) =>
       callback(data)
     ipcRenderer.on('tracker:session-update', handler)
     return () => ipcRenderer.removeListener('tracker:session-update', handler)

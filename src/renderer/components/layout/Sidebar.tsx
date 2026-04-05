@@ -1,6 +1,6 @@
 import React from 'react'
 import { NavLink } from 'react-router-dom'
-import { LayoutDashboard, BarChart2, Clock, Moon, Sun, Tag } from 'lucide-react'
+import { LayoutDashboard, BarChart2, Clock, Moon, Sun, Tag, Settings } from 'lucide-react'
 import { useAppStore } from '../../store/appStore'
 
 const navItems = [
@@ -9,6 +9,7 @@ const navItems = [
   { to: '/limits', label: 'App Limits', icon: Clock },
   { to: '/downtime', label: 'Downtime', icon: Moon },
   { to: '/categories', label: 'Categories', icon: Tag },
+  { to: '/settings', label: 'Settings', icon: Settings },
 ]
 
 export default function Sidebar(): React.ReactElement {

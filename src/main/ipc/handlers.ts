@@ -3,7 +3,7 @@ import path from 'path'
 import fs from 'fs'
 import { DatabaseWrapper } from '../db/sqljs-wrapper'
 import { todayISO, weekRange } from '../utils/timeUtils'
-import { getCurrentSession } from '../modules/tracker'
+import { getCurrentSession, setIdleConfig } from '../modules/tracker'
 
 interface DailyTotal {
   date: string
@@ -235,6 +235,46 @@ export function initIpcHandlers(db: DatabaseWrapper): void {
 
   ipcMain.handle('categories:reset-label', (_event, { categoryId }: { categoryId: string }) => {
     db.prepare('DELETE FROM category_labels WHERE category_id = ?').run(categoryId)
+    return { success: true }
+  })
+
+  // ─── Settings ─────────────────────────────────────────────────────────────
+
+  ipcMain.handle('settings:get-all', () => {
+    const rows = db.prepare('SELECT key, value FROM settings').all() as { key: string; value: string }[]
+    const out: Record<string, string> = {}
+    for (const r of rows) out[r.key] = r.value
+    return out
+  })
+
+  ipcMain.handle('settings:set', (_event, { key, value }: { key: string; value: string }) => {
+    db.prepare(
+      `INSERT INTO settings (key, value) VALUES (?, ?)
+       ON CONFLICT(key) DO UPDATE SET value = excluded.value`
+    ).run(key, value)
+
+    // Apply live if it's an idle setting
+    if (key === 'idle_enabled' || key === 'idle_threshold_minutes') {
+      const enabled = (db.prepare("SELECT value FROM settings WHERE key = 'idle_enabled'").get() as { value: string } | undefined)?.value !== 'false'
+      const minutes = parseInt((db.prepare("SELECT value FROM settings WHERE key = 'idle_threshold_minutes'").get() as { value: string } | undefined)?.value ?? '5', 10)
+      setIdleConfig(enabled, minutes)
+    }
+
+    return { success: true }
+  })
+
+  ipcMain.handle('settings:get-startup', () => {
+    return app.getLoginItemSettings().openAtLogin
+  })
+
+  ipcMain.handle('settings:set-startup', (_event, { enabled }: { enabled: boolean }) => {
+    app.setLoginItemSettings({ openAtLogin: enabled, openAsHidden: true })
+    return { success: true }
+  })
+
+  ipcMain.handle('settings:clear-history', () => {
+    db.prepare('DELETE FROM daily_totals').run()
+    db.prepare('DELETE FROM usage_sessions').run()
     return { success: true }
   })
 }
