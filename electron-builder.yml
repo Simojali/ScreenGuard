@@ -1,21 +1,28 @@
 appId: com.screenguard.app
 productName: ScreenGuard
 copyright: Copyright © 2024
+
 directories:
   buildResources: resources
   output: dist
 files:
   - out/**/*
   - resources/**/*
+
+# ── Windows ──────────────────────────────────────────────────────────────────
 win:
+  icon: resources/app-icon.png
+  # Two targets:
+  #   nsis     → full installer (requires Windows Developer Mode for symlink support)
+  #   portable → single .exe, no install needed — use this for quick tester builds
   target:
     - target: nsis
-      arch:
-        - x64
-  icon: resources/tray-icon.png
+      arch: [x64]
+    - target: portable
+      arch: [x64]
+
 nsis:
   oneClick: false
   allowToChangeInstallationDirectory: true
   createDesktopShortcut: true
   createStartMenuShortcut: true
-afterPack: scripts/afterPack.js
