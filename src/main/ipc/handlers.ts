@@ -1,4 +1,6 @@
 import { ipcMain, app } from 'electron'
+import path from 'path'
+import fs from 'fs'
 import { DatabaseWrapper } from '../db/sqljs-wrapper'
 import { todayISO, weekRange } from '../utils/timeUtils'
 import { getCurrentSession } from '../modules/tracker'
@@ -154,12 +156,45 @@ export function initIpcHandlers(db: DatabaseWrapper): void {
   // ─── App icons ────────────────────────────────────────────────────────────
 
   ipcMain.handle('apps:get-icon', async (_event, { exePath }: { exePath: string }) => {
+    if (!exePath) return null
+
+    // Primary: try to get the icon directly from the exe (works for regular apps)
     try {
       const icon = await app.getFileIcon(exePath, { size: 'normal' })
       return icon.toDataURL()
-    } catch {
-      return null
-    }
+    } catch { /* fall through */ }
+
+    // Fallback for UWP / Windows Store apps:
+    // Windows caches notification/action-center icons for every installed Store app
+    // as PNG files in %LOCALAPPDATA%\Microsoft\Windows\ActionCenterCache\.
+    // The filenames contain the lowercased package name, so we can match by app base name.
+    try {
+      const localAppData = process.env.LOCALAPPDATA ?? ''
+      const cacheDir = path.join(localAppData, 'Microsoft', 'Windows', 'ActionCenterCache')
+
+      // Derive a key from the exe name, stripping .exe and UWP suffixes (.Root/.Desktop/.App)
+      const appKey = path
+        .basename(exePath, path.extname(exePath))
+        .replace(/\.(Root|Desktop|App)$/i, '')
+        .toLowerCase()
+
+      const files = fs.readdirSync(cacheDir).filter(
+        (f) => f.toLowerCase().includes(appKey) && f.endsWith('.png')
+      )
+
+      if (files.length > 0) {
+        // Prefer the largest file (best resolution)
+        const sorted = files
+          .map((f) => ({ f, size: fs.statSync(path.join(cacheDir, f)).size }))
+          .sort((a, b) => b.size - a.size)
+
+        const imgPath = path.join(cacheDir, sorted[0].f)
+        const data = fs.readFileSync(imgPath)
+        return `data:image/png;base64,${data.toString('base64')}`
+      }
+    } catch { /* ignore */ }
+
+    return null
   })
 
   // ─── Category customization ───────────────────────────────────────────────
