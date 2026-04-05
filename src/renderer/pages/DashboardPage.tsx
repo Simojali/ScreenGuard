@@ -181,12 +181,18 @@ export default function DashboardPage(): React.ReactElement {
     return Math.round(weekTotal / daysWithData.length)
   }, [report])
 
-  // Today's total (live from store or from report)
+  // Today's total: start from all apps in the DB report, then overlay live
+  // values (taking the max to handle the 30s flush lag). This prevents the
+  // bug where liveTotals only contains apps active *after* ScreenGuard opened.
   const todayMs = useMemo(() => {
-    const liveTotal = Object.values(liveTotals).reduce((s, ms) => s + ms, 0)
-    if (liveTotal > 0) return liveTotal
-    if (!report?.byDate[today]) return 0
-    return report.byDate[today].reduce((s, t) => s + t.total_ms, 0)
+    const merged: Record<string, number> = {}
+    for (const t of (report?.byDate[today] ?? [])) {
+      merged[t.app_name] = t.total_ms
+    }
+    for (const [app, ms] of Object.entries(liveTotals)) {
+      merged[app] = Math.max(merged[app] ?? 0, ms)
+    }
+    return Object.values(merged).reduce((s, ms) => s + ms, 0)
   }, [liveTotals, report, today])
 
   // Theme-aware chart tooltip colors
