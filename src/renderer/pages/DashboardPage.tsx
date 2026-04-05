@@ -164,6 +164,24 @@ export default function DashboardPage(): React.ReactElement {
   const weekEnd = new Date(weekStart.getTime() + 6 * 86400000)
   const isCurrentWeek = report?.dates?.includes(today) ?? false
 
+  // Average daily usage: total week ms / days that have any data
+  const avgDailyMs = useMemo(() => {
+    if (!report?.dates) return 0
+    const daysWithData = report.dates.filter((d) => (report.byDate[d] ?? []).length > 0)
+    if (daysWithData.length === 0) return 0
+    const weekTotal = daysWithData.reduce((sum, d) =>
+      sum + (report.byDate[d] ?? []).reduce((s, t) => s + t.total_ms, 0), 0)
+    return Math.round(weekTotal / daysWithData.length)
+  }, [report])
+
+  // Today's total (live from store or from report)
+  const todayMs = useMemo(() => {
+    const liveTotal = Object.values(liveTotals).reduce((s, ms) => s + ms, 0)
+    if (liveTotal > 0) return liveTotal
+    if (!report?.byDate[today]) return 0
+    return report.byDate[today].reduce((s, t) => s + t.total_ms, 0)
+  }, [liveTotals, report, today])
+
   // Theme-aware chart tooltip colors
   const isDark = theme === 'dark'
   const ttBg     = isDark ? '#1e2133' : '#ffffff'
@@ -186,15 +204,32 @@ export default function DashboardPage(): React.ReactElement {
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
 
       {/* Header */}
-      <div style={{ marginBottom: 10 }}>
-        <div style={{ fontSize: 11, color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 4 }}>
-          {selectedDay
-            ? new Date(selectedDay + 'T12:00:00').toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })
-            : 'Daily Usage'}
+      <div style={{ marginBottom: 10, display: 'flex', alignItems: 'flex-end', gap: 28 }}>
+        {/* Average daily */}
+        <div>
+          <div style={{ fontSize: 11, color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 4 }}>
+            Average Daily Usage
+          </div>
+          <div style={{ fontSize: 40, fontWeight: 700, color: 'var(--text-1)', letterSpacing: '-2px', lineHeight: 1 }}>
+            {avgDailyMs > 0 ? formatDuration(avgDailyMs) : '—'}
+          </div>
         </div>
-        <div style={{ fontSize: 40, fontWeight: 700, color: 'var(--text-1)', letterSpacing: '-2px', lineHeight: 1 }}>
-          {totalMs > 0 ? formatDuration(totalMs) : '—'}
-        </div>
+
+        {/* Divider */}
+        {isCurrentWeek && (
+          <>
+            <div style={{ width: 1, height: 44, background: 'var(--border)', flexShrink: 0 }} />
+            {/* Today */}
+            <div>
+              <div style={{ fontSize: 11, color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 4 }}>
+                Today
+              </div>
+              <div style={{ fontSize: 40, fontWeight: 700, color: 'var(--accent)', letterSpacing: '-2px', lineHeight: 1 }}>
+                {todayMs > 0 ? formatDuration(todayMs) : '—'}
+              </div>
+            </div>
+          </>
+        )}
       </div>
 
       {/* Week navigation */}
