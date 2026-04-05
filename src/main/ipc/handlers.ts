@@ -161,4 +161,45 @@ export function initIpcHandlers(db: DatabaseWrapper): void {
       return null
     }
   })
+
+  // ─── Category customization ───────────────────────────────────────────────
+
+  ipcMain.handle('categories:get-overrides', () => {
+    return db.prepare('SELECT app_name, category_id FROM category_overrides').all()
+  })
+
+  ipcMain.handle('categories:set-override', (_event, { appName, categoryId }: { appName: string; categoryId: string }) => {
+    db.prepare(
+      `INSERT INTO category_overrides (app_name, category_id) VALUES (?, ?)
+       ON CONFLICT(app_name) DO UPDATE SET category_id = excluded.category_id`
+    ).run(appName, categoryId)
+    return { success: true }
+  })
+
+  ipcMain.handle('categories:remove-override', (_event, { appName }: { appName: string }) => {
+    db.prepare('DELETE FROM category_overrides WHERE app_name = ?').run(appName)
+    return { success: true }
+  })
+
+  ipcMain.handle('categories:reset-overrides-for', (_event, { categoryId }: { categoryId: string }) => {
+    db.prepare('DELETE FROM category_overrides WHERE category_id = ?').run(categoryId)
+    return { success: true }
+  })
+
+  ipcMain.handle('categories:get-labels', () => {
+    return db.prepare('SELECT category_id, label FROM category_labels').all()
+  })
+
+  ipcMain.handle('categories:set-label', (_event, { categoryId, label }: { categoryId: string; label: string }) => {
+    db.prepare(
+      `INSERT INTO category_labels (category_id, label) VALUES (?, ?)
+       ON CONFLICT(category_id) DO UPDATE SET label = excluded.label`
+    ).run(categoryId, label)
+    return { success: true }
+  })
+
+  ipcMain.handle('categories:reset-label', (_event, { categoryId }: { categoryId: string }) => {
+    db.prepare('DELETE FROM category_labels WHERE category_id = ?').run(categoryId)
+    return { success: true }
+  })
 }

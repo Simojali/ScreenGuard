@@ -55,5 +55,18 @@ export const migrations = [
     version INTEGER PRIMARY KEY,
     applied_at INTEGER NOT NULL
   );
+  `,
+
+  // v2 — category customization
+  `
+  CREATE TABLE IF NOT EXISTS category_overrides (
+    app_name    TEXT PRIMARY KEY,
+    category_id TEXT NOT NULL
+  );
+
+  CREATE TABLE IF NOT EXISTS category_labels (
+    category_id TEXT PRIMARY KEY,
+    label       TEXT NOT NULL
+  );
   `
 ]

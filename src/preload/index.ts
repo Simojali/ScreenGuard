@@ -72,6 +72,22 @@ const api = {
   getAppIcon: (exePath: string): Promise<string | null> =>
     ipcRenderer.invoke('apps:get-icon', { exePath }),
 
+  // Category customization
+  getCategoryOverrides: (): Promise<{ app_name: string; category_id: string }[]> =>
+    ipcRenderer.invoke('categories:get-overrides'),
+  setCategoryOverride: (appName: string, categoryId: string): Promise<{ success: boolean }> =>
+    ipcRenderer.invoke('categories:set-override', { appName, categoryId }),
+  removeCategoryOverride: (appName: string): Promise<{ success: boolean }> =>
+    ipcRenderer.invoke('categories:remove-override', { appName }),
+  resetCategoryOverrides: (categoryId: string): Promise<{ success: boolean }> =>
+    ipcRenderer.invoke('categories:reset-overrides-for', { categoryId }),
+  getCategoryLabels: (): Promise<{ category_id: string; label: string }[]> =>
+    ipcRenderer.invoke('categories:get-labels'),
+  setCategoryLabel: (categoryId: string, label: string): Promise<{ success: boolean }> =>
+    ipcRenderer.invoke('categories:set-label', { categoryId, label }),
+  resetCategoryLabel: (categoryId: string): Promise<{ success: boolean }> =>
+    ipcRenderer.invoke('categories:reset-label', { categoryId }),
+
   // Push event listeners
   onSessionUpdate: (
     callback: (data: { appName: string; todayTotalMs: number }) => void

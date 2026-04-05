@@ -31,6 +31,22 @@ export const ipc = {
     invoke<{ appName: string; exePath: string } | null>('getCurrentSession'),
   getAppIcon: (exePath: string) =>
     invoke<string | null>('getAppIcon', exePath),
+
+  // Category customization
+  getCategoryOverrides: () =>
+    invoke<{ app_name: string; category_id: string }[]>('getCategoryOverrides'),
+  setCategoryOverride: (appName: string, categoryId: string) =>
+    invoke<{ success: boolean }>('setCategoryOverride', appName, categoryId),
+  removeCategoryOverride: (appName: string) =>
+    invoke<{ success: boolean }>('removeCategoryOverride', appName),
+  resetCategoryOverrides: (categoryId: string) =>
+    invoke<{ success: boolean }>('resetCategoryOverrides', categoryId),
+  getCategoryLabels: () =>
+    invoke<{ category_id: string; label: string }[]>('getCategoryLabels'),
+  setCategoryLabel: (categoryId: string, label: string) =>
+    invoke<{ success: boolean }>('setCategoryLabel', categoryId, label),
+  resetCategoryLabel: (categoryId: string) =>
+    invoke<{ success: boolean }>('resetCategoryLabel', categoryId),
 }
 
 type SessionUpdateCallback = (data: { appName: string; todayTotalMs: number }) => void

@@ -4,7 +4,7 @@ import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from 
 import { ipc } from '../lib/ipcClient'
 import { dateToISO } from '../lib/dateUtils'
 import { friendlyName } from '../lib/appNames'
-import { CATEGORIES, getCategoryId } from '../lib/categories'
+import { CATEGORIES, resolveCategoryId, resolveLabel } from '../lib/categories'
 import { useAppStore } from '../store/appStore'
 import { useAppIcons } from '../hooks/useAppIcons'
 import { useLimits } from '../hooks/useLimits'
@@ -54,6 +54,8 @@ export default function DashboardPage(): React.ReactElement {
   const currentApp = useAppStore((s) => s.currentApp)
   const liveTotals = useAppStore((s) => s.todayTotals)
   const theme = useAppStore((s) => s.theme)
+  const categoryOverrides = useAppStore((s) => s.categoryOverrides)
+  const categoryLabels = useAppStore((s) => s.categoryLabels)
   const { limits } = useLimits()
   const today = dateToISO(new Date())
 
@@ -132,12 +134,12 @@ export default function DashboardPage(): React.ReactElement {
       const dayLabel = ['S', 'M', 'T', 'W', 'T', 'F', 'S'][new Date(date + 'T12:00:00').getDay()]
       const entry: ChartEntry = { date, dayLabel }
       for (const t of dayTotals) {
-        const catId = getCategoryId(t.app_name)
+        const catId = resolveCategoryId(t.app_name, categoryOverrides)
         entry[catId] = ((entry[catId] as number) || 0) + Math.round(t.total_ms / 60000)
       }
       return entry
     })
-  }, [report])
+  }, [report, categoryOverrides])
 
   const activeCats = useMemo(
     () => CATEGORIES.filter((cat) => catChartData.some((e) => (e[cat.id] as number) > 0)),
@@ -147,16 +149,21 @@ export default function DashboardPage(): React.ReactElement {
   const categoryTotals = useMemo(() => {
     const m: Record<string, { totalMs: number; appCount: number }> = {}
     for (const t of displayList) {
-      const catId = getCategoryId(t.app_name)
+      const catId = resolveCategoryId(t.app_name, categoryOverrides)
       if (!m[catId]) m[catId] = { totalMs: 0, appCount: 0 }
       m[catId].totalMs += t.total_ms
       m[catId].appCount++
     }
     return CATEGORIES
-      .map((cat) => ({ ...cat, totalMs: m[cat.id]?.totalMs ?? 0, appCount: m[cat.id]?.appCount ?? 0 }))
+      .map((cat) => ({
+        ...cat,
+        label: resolveLabel(cat.id, categoryLabels),
+        totalMs: m[cat.id]?.totalMs ?? 0,
+        appCount: m[cat.id]?.appCount ?? 0,
+      }))
       .filter((c) => c.totalMs > 0)
       .sort((a, b) => b.totalMs - a.totalMs)
-  }, [displayList])
+  }, [displayList, categoryOverrides, categoryLabels])
 
   const activeChartData = viewMode === 'categories' ? catChartData : appsChartData
   const icons = useAppIcons(displayList.map((t) => t.exe_path).filter(Boolean))
@@ -297,7 +304,8 @@ export default function DashboardPage(): React.ReactElement {
               formatter={(v: number, name: string) => {
                 if (viewMode === 'categories') {
                   const cat = CATEGORIES.find((c) => c.id === name)
-                  return [formatDuration(v * 60000), cat ? `${cat.icon} ${cat.label}` : name]
+                  const label = cat ? resolveLabel(cat.id, categoryLabels) : name
+                  return [formatDuration(v * 60000), cat ? `${cat.icon} ${label}` : name]
                 }
                 return [formatDuration(v * 60000), name === '__other__' ? 'Other' : friendlyName(name)]
               }}
@@ -358,7 +366,7 @@ export default function DashboardPage(): React.ReactElement {
               return (
                 <div key={cat.id} style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
                   <div style={{ width: 8, height: 8, borderRadius: 2, background: cat.color, flexShrink: 0 }} />
-                  <span style={{ fontSize: 11, color: 'var(--text-3)' }}>{cat.label}</span>
+                  <span style={{ fontSize: 11, color: 'var(--text-3)' }}>{resolveLabel(cat.id, categoryLabels)}</span>
                   {total > 0 && <span style={{ fontSize: 11, color: 'var(--text-4)' }}>{formatDuration(total)}</span>}
                 </div>
               )

@@ -7,10 +7,14 @@ interface AppState {
   currentApp: string | null
   todayTotals: Record<string, number>
   theme: Theme
+  categoryOverrides: Record<string, string>  // appName → categoryId
+  categoryLabels: Record<string, string>     // categoryId → custom label
   setCurrentApp: (appName: string | null) => void
   updateTodayTotal: (appName: string, totalMs: number) => void
   setTodayTotals: (totals: DailyTotal[]) => void
   toggleTheme: () => void
+  setCategoryOverrides: (overrides: Record<string, string>) => void
+  setCategoryLabels: (labels: Record<string, string>) => void
 }
 
 function applyTheme(t: Theme) {
@@ -24,6 +28,8 @@ export const useAppStore = create<AppState>((set) => ({
   currentApp: null,
   todayTotals: {},
   theme: savedTheme,
+  categoryOverrides: {},
+  categoryLabels: {},
 
   setCurrentApp: (appName) => set({ currentApp: appName }),
 
@@ -46,4 +52,7 @@ export const useAppStore = create<AppState>((set) => ({
       applyTheme(next)
       return { theme: next }
     }),
+
+  setCategoryOverrides: (overrides) => set({ categoryOverrides: overrides }),
+  setCategoryLabels: (labels) => set({ categoryLabels: labels }),
 }))
