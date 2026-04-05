@@ -18,23 +18,23 @@ export default function Modal({ title, onClose, children }: Props): React.ReactE
     <div
       onClick={onClose}
       style={{
-        position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)',
+        position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)',
         display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100,
       }}
     >
       <div
         onClick={(e) => e.stopPropagation()}
         style={{
-          background: '#1a1d2e', border: '1px solid #2d3148',
+          background: 'var(--bg-card)', border: '1px solid var(--border)',
           borderRadius: 12, padding: 24, minWidth: 380, maxWidth: 480,
-          boxShadow: '0 20px 60px rgba(0,0,0,0.5)',
+          boxShadow: '0 20px 60px rgba(0,0,0,0.3)',
         }}
       >
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
-          <h2 style={{ fontSize: 16, fontWeight: 600, color: '#e2e8f0' }}>{title}</h2>
+          <h2 style={{ fontSize: 16, fontWeight: 600, color: 'var(--text-1)' }}>{title}</h2>
           <button
             onClick={onClose}
-            style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#64748b', padding: 4 }}
+            style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-3)', padding: 4 }}
           >
             <X size={18} />
           </button>

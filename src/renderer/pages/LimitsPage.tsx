@@ -20,7 +20,7 @@ export default function LimitsPage(): React.ReactElement {
   const [showModal, setShowModal] = useState(false)
   const [knownApps, setKnownApps] = useState<KnownApp[]>([])
   const [selectedApp, setSelectedApp] = useState<KnownApp | null>(null)
-  const [limitMs, setLimitMs] = useState(3600000) // default 1h
+  const [limitMs, setLimitMs] = useState(3600000)
 
   async function openModal() {
     const apps = await ipc.getKnownApps()
@@ -47,32 +47,27 @@ export default function LimitsPage(): React.ReactElement {
     refresh()
   }
 
-  const btnStyle: React.CSSProperties = {
-    display: 'flex', alignItems: 'center', gap: 6,
-    padding: '8px 14px', borderRadius: 8,
-    background: '#7c8cf8', color: '#fff', border: 'none',
-    cursor: 'pointer', fontSize: 13, fontWeight: 500,
-  }
-
-  const selectStyle: React.CSSProperties = {
-    width: '100%', background: '#1e2133', border: '1px solid #374162',
-    borderRadius: 8, color: '#e2e8f0', padding: '8px 10px', fontSize: 14,
-    marginBottom: 16,
-  }
-
   return (
     <div>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 }}>
-        <h1 style={{ fontSize: 20, fontWeight: 700, color: '#e2e8f0' }}>App Limits</h1>
-        <button style={btnStyle} onClick={openModal}>
+        <h1 style={{ fontSize: 20, fontWeight: 700, color: 'var(--text-1)' }}>App Limits</h1>
+        <button
+          onClick={openModal}
+          style={{
+            display: 'flex', alignItems: 'center', gap: 6,
+            padding: '8px 14px', borderRadius: 8,
+            background: 'var(--accent)', color: '#fff', border: 'none',
+            cursor: 'pointer', fontSize: 13, fontWeight: 500,
+          }}
+        >
           <Plus size={14} /> Add Limit
         </button>
       </div>
 
       {loading ? (
-        <div style={{ color: '#64748b', textAlign: 'center', marginTop: 60 }}>Loading...</div>
+        <div style={{ color: 'var(--text-3)', textAlign: 'center', marginTop: 60 }}>Loading...</div>
       ) : limits.length === 0 ? (
-        <div style={{ textAlign: 'center', color: '#64748b', marginTop: 60, fontSize: 14, lineHeight: 1.8 }}>
+        <div style={{ textAlign: 'center', color: 'var(--text-3)', marginTop: 60, fontSize: 14, lineHeight: 1.8 }}>
           <div style={{ fontSize: 32, marginBottom: 12 }}>⏱</div>
           No limits set yet.<br />
           Add a limit to control how long you spend in an app each day.
@@ -83,25 +78,24 @@ export default function LimitsPage(): React.ReactElement {
             <div
               key={limit.app_name}
               style={{
-                background: '#1a1d2e', border: '1px solid #2d3148',
+                background: 'var(--bg-card)', border: '1px solid var(--border)',
                 borderRadius: 10, padding: '14px 16px',
                 display: 'flex', alignItems: 'center', gap: 12,
                 opacity: limit.is_enabled ? 1 : 0.5,
               }}
             >
               <div style={{ flex: 1 }}>
-                <div style={{ fontSize: 14, fontWeight: 500, color: '#e2e8f0' }}>{friendlyName(limit.app_name)}</div>
-                <div style={{ fontSize: 12, color: '#64748b', marginTop: 2 }}>
-                  Daily limit: <span style={{ color: '#7c8cf8' }}>{formatDuration(limit.limit_ms)}</span>
+                <div style={{ fontSize: 14, fontWeight: 500, color: 'var(--text-1)' }}>
+                  {friendlyName(limit.app_name)}
+                </div>
+                <div style={{ fontSize: 12, color: 'var(--text-3)', marginTop: 2 }}>
+                  Daily limit: <span style={{ color: 'var(--accent)' }}>{formatDuration(limit.limit_ms)}</span>
                 </div>
               </div>
-              <Toggle
-                checked={limit.is_enabled === 1}
-                onChange={(v) => handleToggle(limit.app_name, v)}
-              />
+              <Toggle checked={limit.is_enabled === 1} onChange={(v) => handleToggle(limit.app_name, v)} />
               <button
                 onClick={() => handleDelete(limit.app_name)}
-                style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#475569', padding: 4 }}
+                style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-4)', padding: 4 }}
               >
                 <Trash2 size={15} />
               </button>
@@ -113,40 +107,40 @@ export default function LimitsPage(): React.ReactElement {
       {showModal && (
         <Modal title="Add App Limit" onClose={() => setShowModal(false)}>
           <div>
-            <label style={{ fontSize: 12, color: '#94a3b8', display: 'block', marginBottom: 6 }}>App</label>
+            <label style={{ fontSize: 12, color: 'var(--text-2)', display: 'block', marginBottom: 6 }}>App</label>
             {knownApps.length > 0 ? (
               <select
-                style={selectStyle}
-                value={selectedApp?.app_name ?? ''}
-                onChange={(e) => {
-                  const app = knownApps.find((a) => a.app_name === e.target.value) ?? null
-                  setSelectedApp(app)
+                style={{
+                  width: '100%', background: 'var(--bg-row)', border: '1px solid var(--border-hi)',
+                  borderRadius: 8, color: 'var(--text-1)', padding: '8px 10px', fontSize: 14, marginBottom: 16,
                 }}
+                value={selectedApp?.app_name ?? ''}
+                onChange={(e) => setSelectedApp(knownApps.find((a) => a.app_name === e.target.value) ?? null)}
               >
                 {knownApps.map((a) => (
                   <option key={a.app_name} value={a.app_name}>{friendlyName(a.app_name)}</option>
                 ))}
               </select>
             ) : (
-              <div style={{ fontSize: 13, color: '#64748b', marginBottom: 16 }}>
+              <div style={{ fontSize: 13, color: 'var(--text-3)', marginBottom: 16 }}>
                 No apps tracked yet. Use your computer for a bit first.
               </div>
             )}
 
-            <label style={{ fontSize: 12, color: '#94a3b8', display: 'block', marginBottom: 8 }}>Daily Limit</label>
+            <label style={{ fontSize: 12, color: 'var(--text-2)', display: 'block', marginBottom: 8 }}>Daily Limit</label>
             <DurationInput valueMs={limitMs} onChange={setLimitMs} />
 
             <div style={{ display: 'flex', gap: 8, marginTop: 20, justifyContent: 'flex-end' }}>
               <button
                 onClick={() => setShowModal(false)}
-                style={{ padding: '8px 16px', borderRadius: 8, background: 'none', border: '1px solid #374162', color: '#94a3b8', cursor: 'pointer', fontSize: 13 }}
+                style={{ padding: '8px 16px', borderRadius: 8, background: 'none', border: '1px solid var(--border-hi)', color: 'var(--text-2)', cursor: 'pointer', fontSize: 13 }}
               >
                 Cancel
               </button>
               <button
                 onClick={handleSave}
                 disabled={!selectedApp || limitMs === 0}
-                style={{ padding: '8px 16px', borderRadius: 8, background: '#7c8cf8', color: '#fff', border: 'none', cursor: 'pointer', fontSize: 13, fontWeight: 500 }}
+                style={{ padding: '8px 16px', borderRadius: 8, background: 'var(--accent)', color: '#fff', border: 'none', cursor: 'pointer', fontSize: 13, fontWeight: 500 }}
               >
                 Save Limit
               </button>

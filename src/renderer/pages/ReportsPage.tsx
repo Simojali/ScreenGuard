@@ -6,6 +6,7 @@ import {
 import { ipc } from '../lib/ipcClient'
 import { dateToISO } from '../lib/dateUtils'
 import { friendlyName } from '../lib/appNames'
+import { useAppStore } from '../store/appStore'
 import type { WeeklyReport, DailyTotal } from '../types'
 
 function formatDuration(ms: number): string {
@@ -18,8 +19,7 @@ function formatDuration(ms: number): string {
 function mondayOf(date: Date): Date {
   const d = new Date(date)
   const day = d.getDay()
-  const diff = day === 0 ? -6 : 1 - day
-  d.setDate(d.getDate() + diff)
+  d.setDate(d.getDate() + (day === 0 ? -6 : 1 - day))
   return d
 }
 
@@ -31,6 +31,7 @@ export default function ReportsPage(): React.ReactElement {
   const [selectedDate, setSelectedDate] = useState<Date>(new Date())
   const [dailyData, setDailyData] = useState<DailyTotal[]>([])
   const [weeklyReport, setWeeklyReport] = useState<WeeklyReport | null>(null)
+  const theme = useAppStore((s) => s.theme)
 
   useEffect(() => {
     if (view === 'daily') {
@@ -40,13 +41,11 @@ export default function ReportsPage(): React.ReactElement {
     }
   }, [view, selectedDate, weekStart])
 
-  // ── Daily view data ──────────────────────────────────────────────────────
   const dailyChartData = dailyData
     .sort((a, b) => b.total_ms - a.total_ms)
     .slice(0, 10)
     .map((d) => ({ name: friendlyName(d.app_name), value: Math.round(d.total_ms / 60000) }))
 
-  // ── Weekly view data ─────────────────────────────────────────────────────
   const weeklyChartData = weeklyReport?.dates
     ? weeklyReport.dates.map((date) => {
         const totals = weeklyReport.byDate[date] ?? []
@@ -58,24 +57,32 @@ export default function ReportsPage(): React.ReactElement {
       })
     : []
 
+  // Theme-aware chart colors
+  const isDark = theme === 'dark'
+  const axisStroke  = isDark ? '#374162' : '#c9d1e3'
+  const tickFill    = isDark ? '#64748b' : '#9ca3af'
+  const tickFill2   = isDark ? '#94a3b8' : '#4b5563'
+  const ttBg        = isDark ? '#1e2133' : '#ffffff'
+  const ttBorder    = isDark ? '#374162' : '#c9d1e3'
+  const ttText      = isDark ? '#e2e8f0' : '#111827'
+
   const navBtnStyle: React.CSSProperties = {
-    background: 'none', border: '1px solid #374162', borderRadius: 6,
-    color: '#94a3b8', cursor: 'pointer', padding: '5px 8px', display: 'flex', alignItems: 'center',
+    background: 'none', border: '1px solid var(--border-hi)', borderRadius: 6,
+    color: 'var(--text-2)', cursor: 'pointer', padding: '5px 8px', display: 'flex', alignItems: 'center',
   }
 
   const tabStyle = (active: boolean): React.CSSProperties => ({
     padding: '6px 14px', borderRadius: 6, border: 'none', cursor: 'pointer', fontSize: 13,
-    background: active ? '#7c8cf8' : 'transparent',
-    color: active ? '#fff' : '#64748b',
+    background: active ? 'var(--accent)' : 'transparent',
+    color: active ? '#fff' : 'var(--text-3)',
     fontWeight: active ? 600 : 400,
   })
 
   return (
     <div>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 }}>
-        <h1 style={{ fontSize: 20, fontWeight: 700, color: '#e2e8f0' }}>Reports</h1>
-
-        <div style={{ display: 'flex', gap: 4, background: '#1a1d2e', borderRadius: 8, padding: 4, border: '1px solid #2d3148' }}>
+        <h1 style={{ fontSize: 20, fontWeight: 700, color: 'var(--text-1)' }}>Reports</h1>
+        <div style={{ display: 'flex', gap: 4, background: 'var(--bg-card)', borderRadius: 8, padding: 4, border: '1px solid var(--border)' }}>
           <button style={tabStyle(view === 'daily')} onClick={() => setView('daily')}>Daily</button>
           <button style={tabStyle(view === 'weekly')} onClick={() => setView('weekly')}>Weekly</button>
         </div>
@@ -83,95 +90,83 @@ export default function ReportsPage(): React.ReactElement {
 
       {/* Date navigation */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 24 }}>
-        <button
-          style={navBtnStyle}
-          onClick={() => {
-            if (view === 'daily') { const d = new Date(selectedDate); d.setDate(d.getDate() - 1); setSelectedDate(d) }
-            else { const d = new Date(weekStart); d.setDate(d.getDate() - 7); setWeekStart(d) }
-          }}
-        ><ChevronLeft size={16} /></button>
+        <button style={navBtnStyle} onClick={() => {
+          if (view === 'daily') { const d = new Date(selectedDate); d.setDate(d.getDate() - 1); setSelectedDate(d) }
+          else { const d = new Date(weekStart); d.setDate(d.getDate() - 7); setWeekStart(d) }
+        }}><ChevronLeft size={16} /></button>
 
-        <span style={{ fontSize: 14, color: '#e2e8f0', minWidth: 180, textAlign: 'center' }}>
+        <span style={{ fontSize: 14, color: 'var(--text-1)', minWidth: 180, textAlign: 'center' }}>
           {view === 'daily'
             ? selectedDate.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })
             : `${weekStart.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} – ${new Date(weekStart.getTime() + 6 * 86400000).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`
           }
         </span>
 
-        <button
-          style={navBtnStyle}
-          onClick={() => {
-            if (view === 'daily') { const d = new Date(selectedDate); d.setDate(d.getDate() + 1); setSelectedDate(d) }
-            else { const d = new Date(weekStart); d.setDate(d.getDate() + 7); setWeekStart(d) }
-          }}
-        ><ChevronRight size={16} /></button>
+        <button style={navBtnStyle} onClick={() => {
+          if (view === 'daily') { const d = new Date(selectedDate); d.setDate(d.getDate() + 1); setSelectedDate(d) }
+          else { const d = new Date(weekStart); d.setDate(d.getDate() + 7); setWeekStart(d) }
+        }}><ChevronRight size={16} /></button>
       </div>
 
       {/* Charts */}
       {view === 'daily' ? (
         <div style={{ display: 'flex', gap: 20 }}>
-          {/* Bar chart */}
-          <div style={{ flex: 2, background: '#1a1d2e', border: '1px solid #2d3148', borderRadius: 12, padding: 20 }}>
-            <div style={{ fontSize: 13, color: '#64748b', marginBottom: 16 }}>Time by app (minutes)</div>
+          <div style={{ flex: 2, background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 12, padding: 20 }}>
+            <div style={{ fontSize: 13, color: 'var(--text-3)', marginBottom: 16 }}>Time by app (minutes)</div>
             {dailyChartData.length === 0 ? (
-              <div style={{ color: '#475569', textAlign: 'center', padding: '40px 0' }}>No data for this day</div>
+              <div style={{ color: 'var(--text-4)', textAlign: 'center', padding: '40px 0' }}>No data for this day</div>
             ) : (
               <ResponsiveContainer width="100%" height={280}>
                 <BarChart data={dailyChartData} layout="vertical" margin={{ left: 10, right: 20 }}>
-                  <XAxis type="number" stroke="#374162" tick={{ fill: '#64748b', fontSize: 11 }} />
-                  <YAxis type="category" dataKey="name" width={120} stroke="#374162" tick={{ fill: '#94a3b8', fontSize: 12 }} />
+                  <XAxis type="number" stroke={axisStroke} tick={{ fill: tickFill, fontSize: 11 }} />
+                  <YAxis type="category" dataKey="name" width={120} stroke={axisStroke} tick={{ fill: tickFill2, fontSize: 12 }} />
                   <Tooltip
-                    contentStyle={{ background: '#1e2133', border: '1px solid #374162', borderRadius: 8 }}
-                    labelStyle={{ color: '#e2e8f0' }}
+                    contentStyle={{ background: ttBg, border: `1px solid ${ttBorder}`, borderRadius: 8 }}
+                    labelStyle={{ color: ttText }}
                     formatter={(v: number) => [`${v}m`, 'Time']}
                   />
                   <Bar dataKey="value" radius={[0, 4, 4, 0]}>
-                    {dailyChartData.map((_, i) => (
-                      <Cell key={i} fill={COLORS[i % COLORS.length]} />
-                    ))}
+                    {dailyChartData.map((_, i) => <Cell key={i} fill={COLORS[i % COLORS.length]} />)}
                   </Bar>
                 </BarChart>
               </ResponsiveContainer>
             )}
           </div>
 
-          {/* Pie chart */}
-          <div style={{ flex: 1, background: '#1a1d2e', border: '1px solid #2d3148', borderRadius: 12, padding: 20 }}>
-            <div style={{ fontSize: 13, color: '#64748b', marginBottom: 16 }}>Share</div>
+          <div style={{ flex: 1, background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 12, padding: 20 }}>
+            <div style={{ fontSize: 13, color: 'var(--text-3)', marginBottom: 16 }}>Share</div>
             {dailyChartData.length > 0 && (
               <ResponsiveContainer width="100%" height={280}>
                 <PieChart>
                   <Pie data={dailyChartData} dataKey="value" nameKey="name" cx="50%" cy="45%" outerRadius={80}>
-                    {dailyChartData.map((_, i) => (
-                      <Cell key={i} fill={COLORS[i % COLORS.length]} />
-                    ))}
+                    {dailyChartData.map((_, i) => <Cell key={i} fill={COLORS[i % COLORS.length]} />)}
                   </Pie>
                   <Tooltip
-                    contentStyle={{ background: '#1e2133', border: '1px solid #374162', borderRadius: 8 }}
+                    contentStyle={{ background: ttBg, border: `1px solid ${ttBorder}`, borderRadius: 8 }}
                     formatter={(v: number) => [`${v}m`, 'Time']}
                   />
-                  <Legend wrapperStyle={{ fontSize: 11, color: '#94a3b8' }} />
+                  <Legend wrapperStyle={{ fontSize: 11, color: tickFill2 }} />
                 </PieChart>
               </ResponsiveContainer>
             )}
           </div>
         </div>
       ) : (
-        <div style={{ background: '#1a1d2e', border: '1px solid #2d3148', borderRadius: 12, padding: 20 }}>
-          <div style={{ fontSize: 13, color: '#64748b', marginBottom: 16 }}>Daily total screen time (minutes)</div>
+        <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 12, padding: 20 }}>
+          <div style={{ fontSize: 13, color: 'var(--text-3)', marginBottom: 16 }}>Daily total screen time (minutes)</div>
           {weeklyChartData.every((d) => d.minutes === 0) ? (
-            <div style={{ color: '#475569', textAlign: 'center', padding: '40px 0' }}>No data for this week</div>
+            <div style={{ color: 'var(--text-4)', textAlign: 'center', padding: '40px 0' }}>No data for this week</div>
           ) : (
             <ResponsiveContainer width="100%" height={280}>
               <BarChart data={weeklyChartData} margin={{ left: 0, right: 20 }}>
-                <XAxis dataKey="date" stroke="#374162" tick={{ fill: '#94a3b8', fontSize: 12 }} />
-                <YAxis stroke="#374162" tick={{ fill: '#64748b', fontSize: 11 }} />
+                <XAxis dataKey="date" stroke={axisStroke} tick={{ fill: tickFill2, fontSize: 12 }} />
+                <YAxis stroke={axisStroke} tick={{ fill: tickFill, fontSize: 11 }} />
                 <Tooltip
-                  contentStyle={{ background: '#1e2133', border: '1px solid #374162', borderRadius: 8 }}
+                  contentStyle={{ background: ttBg, border: `1px solid ${ttBorder}`, borderRadius: 8 }}
                   formatter={(v: number) => [formatDuration(v * 60000), 'Screen time']}
-                  labelStyle={{ color: '#e2e8f0' }}
+                  labelStyle={{ color: ttText }}
                 />
-                <Bar dataKey="minutes" fill="#7c8cf8" radius={[4, 4, 0, 0]} />
+                <Bar dataKey="minutes" fill="var(--accent)" radius={[4, 4, 0, 0]} />
               </BarChart>
             </ResponsiveContainer>
           )}

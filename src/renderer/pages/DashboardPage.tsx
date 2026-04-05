@@ -4,13 +4,17 @@ import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from 
 import { ipc } from '../lib/ipcClient'
 import { dateToISO } from '../lib/dateUtils'
 import { friendlyName } from '../lib/appNames'
+import { CATEGORIES, getCategoryId } from '../lib/categories'
 import { useAppStore } from '../store/appStore'
 import { useAppIcons } from '../hooks/useAppIcons'
 import { useLimits } from '../hooks/useLimits'
 import type { WeeklyReport, DailyTotal, AppLimit } from '../types'
 
-const COLORS = ['#7c8cf8', '#38bdf8', '#34d399', '#f59e0b', '#f87171', '#a78bfa', '#fb7185']
+const APP_COLORS = ['#7c8cf8', '#38bdf8', '#34d399', '#f59e0b', '#f87171', '#a78bfa', '#fb7185']
 const MAX_CHART_APPS = 5
+
+type ViewMode = 'apps' | 'categories'
+type ChartEntry = { date: string; dayLabel: string; [key: string]: string | number }
 
 function mondayOf(date: Date): Date {
   const d = new Date(date)
@@ -28,7 +32,7 @@ function formatDuration(ms: number): string {
 }
 
 function LetterIcon({ name, size = 28 }: { name: string; size?: number }): React.ReactElement {
-  const color = COLORS[name.charCodeAt(0) % COLORS.length]
+  const color = APP_COLORS[name.charCodeAt(0) % APP_COLORS.length]
   const letter = name.replace(/\.exe$/i, '').charAt(0).toUpperCase()
   return (
     <div style={{
@@ -41,17 +45,16 @@ function LetterIcon({ name, size = 28 }: { name: string; size?: number }): React
   )
 }
 
-type ChartEntry = { date: string; dayLabel: string; [key: string]: string | number }
-
 export default function DashboardPage(): React.ReactElement {
   const [weekStart, setWeekStart] = useState<Date>(() => mondayOf(new Date()))
   const [report, setReport] = useState<WeeklyReport | null>(null)
   const [selectedDay, setSelectedDay] = useState<string | null>(null)
+  const [viewMode, setViewMode] = useState<ViewMode>('apps')
 
   const currentApp = useAppStore((s) => s.currentApp)
   const liveTotals = useAppStore((s) => s.todayTotals)
+  const theme = useAppStore((s) => s.theme)
   const { limits } = useLimits()
-
   const today = dateToISO(new Date())
 
   useEffect(() => {
@@ -67,7 +70,6 @@ export default function DashboardPage(): React.ReactElement {
     return m
   }, [limits])
 
-  // Aggregate per-app weekly totals, applying live values for today
   const weeklyByApp = useMemo<Record<string, DailyTotal>>(() => {
     if (!report) return {}
     const m: Record<string, DailyTotal> = {}
@@ -90,7 +92,6 @@ export default function DashboardPage(): React.ReactElement {
     [weeklyByApp]
   )
 
-  // App list: selected day or full week
   const displayList = useMemo<DailyTotal[]>(() => {
     if (selectedDay) {
       return [...(report?.byDate[selectedDay] ?? [])].sort((a, b) => b.total_ms - a.total_ms)
@@ -100,11 +101,11 @@ export default function DashboardPage(): React.ReactElement {
 
   const totalMs = displayList.reduce((s, t) => s + t.total_ms, 0)
 
-  // Top apps for stacked chart
+  // Apps chart
   const topApps = weeklyTotals.slice(0, MAX_CHART_APPS).map((t) => t.app_name)
-  const hasOther = weeklyTotals.length > MAX_CHART_APPS
+  const hasOtherApps = weeklyTotals.length > MAX_CHART_APPS
 
-  const chartData = useMemo<ChartEntry[]>(() => {
+  const appsChartData = useMemo<ChartEntry[]>(() => {
     if (!report?.dates) return []
     return report.dates.map((date) => {
       const dayTotals = report.byDate[date] ?? []
@@ -123,28 +124,75 @@ export default function DashboardPage(): React.ReactElement {
     })
   }, [report, topApps])
 
+  // Categories chart
+  const catChartData = useMemo<ChartEntry[]>(() => {
+    if (!report?.dates) return []
+    return report.dates.map((date) => {
+      const dayTotals = report.byDate[date] ?? []
+      const dayLabel = ['S', 'M', 'T', 'W', 'T', 'F', 'S'][new Date(date + 'T12:00:00').getDay()]
+      const entry: ChartEntry = { date, dayLabel }
+      for (const t of dayTotals) {
+        const catId = getCategoryId(t.app_name)
+        entry[catId] = ((entry[catId] as number) || 0) + Math.round(t.total_ms / 60000)
+      }
+      return entry
+    })
+  }, [report])
+
+  const activeCats = useMemo(
+    () => CATEGORIES.filter((cat) => catChartData.some((e) => (e[cat.id] as number) > 0)),
+    [catChartData]
+  )
+
+  const categoryTotals = useMemo(() => {
+    const m: Record<string, { totalMs: number; appCount: number }> = {}
+    for (const t of displayList) {
+      const catId = getCategoryId(t.app_name)
+      if (!m[catId]) m[catId] = { totalMs: 0, appCount: 0 }
+      m[catId].totalMs += t.total_ms
+      m[catId].appCount++
+    }
+    return CATEGORIES
+      .map((cat) => ({ ...cat, totalMs: m[cat.id]?.totalMs ?? 0, appCount: m[cat.id]?.appCount ?? 0 }))
+      .filter((c) => c.totalMs > 0)
+      .sort((a, b) => b.totalMs - a.totalMs)
+  }, [displayList])
+
+  const activeChartData = viewMode === 'categories' ? catChartData : appsChartData
   const icons = useAppIcons(displayList.map((t) => t.exe_path).filter(Boolean))
 
   const weekEnd = new Date(weekStart.getTime() + 6 * 86400000)
   const isCurrentWeek = report?.dates?.includes(today) ?? false
 
+  // Theme-aware chart tooltip colors
+  const isDark = theme === 'dark'
+  const ttBg     = isDark ? '#1e2133' : '#ffffff'
+  const ttBorder = isDark ? '#374162' : '#c9d1e3'
+
   const navBtn: React.CSSProperties = {
-    background: 'none', border: '1px solid #2d3148', borderRadius: 6,
-    color: '#64748b', cursor: 'pointer', padding: '4px 8px',
+    background: 'none', border: '1px solid var(--border)', borderRadius: 6,
+    color: 'var(--text-3)', cursor: 'pointer', padding: '4px 8px',
     display: 'flex', alignItems: 'center',
   }
+
+  const tabStyle = (active: boolean): React.CSSProperties => ({
+    padding: '4px 12px', borderRadius: 6, fontSize: 12, fontWeight: active ? 600 : 400,
+    background: active ? 'var(--accent)' : 'transparent',
+    color: active ? '#fff' : 'var(--text-3)',
+    cursor: 'pointer', border: 'none',
+  })
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
 
-      {/* Header: label + big total */}
+      {/* Header */}
       <div style={{ marginBottom: 10 }}>
-        <div style={{ fontSize: 11, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 4 }}>
+        <div style={{ fontSize: 11, color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 4 }}>
           {selectedDay
             ? new Date(selectedDay + 'T12:00:00').toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })
             : 'Daily Usage'}
         </div>
-        <div style={{ fontSize: 40, fontWeight: 700, color: '#e2e8f0', letterSpacing: '-2px', lineHeight: 1 }}>
+        <div style={{ fontSize: 40, fontWeight: 700, color: 'var(--text-1)', letterSpacing: '-2px', lineHeight: 1 }}>
           {totalMs > 0 ? formatDuration(totalMs) : '—'}
         </div>
       </div>
@@ -154,7 +202,7 @@ export default function DashboardPage(): React.ReactElement {
         <button style={navBtn} onClick={() => { const d = new Date(weekStart); d.setDate(d.getDate() - 7); setWeekStart(d) }}>
           <ChevronLeft size={14} />
         </button>
-        <span style={{ fontSize: 12, color: '#64748b', minWidth: 140, textAlign: 'center' }}>
+        <span style={{ fontSize: 12, color: 'var(--text-3)', minWidth: 140, textAlign: 'center' }}>
           {weekStart.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
           {' – '}
           {weekEnd.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
@@ -175,10 +223,10 @@ export default function DashboardPage(): React.ReactElement {
       </div>
 
       {/* Chart card */}
-      <div style={{ background: '#1a1d2e', border: '1px solid #2d3148', borderRadius: 12, padding: '14px 14px 10px', marginBottom: 14, flexShrink: 0 }}>
+      <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 12, padding: '14px 14px 10px', marginBottom: 14, flexShrink: 0 }}>
         <ResponsiveContainer width="100%" height={148}>
           <BarChart
-            data={chartData}
+            data={activeChartData}
             barCategoryGap="32%"
             onClick={(e) => {
               if (e?.activePayload?.length) {
@@ -189,20 +237,15 @@ export default function DashboardPage(): React.ReactElement {
             style={{ cursor: 'pointer' }}
           >
             <XAxis
-              dataKey="dayLabel"
-              axisLine={false}
-              tickLine={false}
+              dataKey="dayLabel" axisLine={false} tickLine={false}
               tick={(props: { x: number; y: number; payload: { value: string }; index: number }) => {
-                const date = chartData[props.index]?.date
+                const date = activeChartData[props.index]?.date
                 const isSelected = date === selectedDay
                 const isToday = date === today
+                const fill = isSelected ? 'var(--accent)' : isToday ? (isDark ? '#c7d2fe' : '#6366f1') : 'var(--text-4)'
                 return (
-                  <text
-                    x={props.x} y={props.y + 13}
-                    textAnchor="middle"
-                    fill={isSelected ? '#7c8cf8' : isToday ? '#c7d2fe' : '#475569'}
-                    fontSize={11}
-                    fontWeight={isSelected || isToday ? 700 : 400}
+                  <text x={props.x} y={props.y + 13} textAnchor="middle"
+                    fill={fill} fontSize={11} fontWeight={isSelected || isToday ? 700 : 400}
                   >
                     {props.payload.value}
                   </text>
@@ -211,142 +254,187 @@ export default function DashboardPage(): React.ReactElement {
             />
             <YAxis hide />
             <Tooltip
-              contentStyle={{ background: '#1e2133', border: '1px solid #2d3148', borderRadius: 8, fontSize: 12 }}
+              contentStyle={{ background: ttBg, border: `1px solid ${ttBorder}`, borderRadius: 8, fontSize: 12 }}
               labelFormatter={(_, payload) => {
                 const date = (payload?.[0]?.payload as ChartEntry)?.date
-                return date
-                  ? new Date(date + 'T12:00:00').toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })
-                  : ''
+                return date ? new Date(date + 'T12:00:00').toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' }) : ''
               }}
-              formatter={(v: number, name: string) => [
-                formatDuration(v * 60000),
-                name === '__other__' ? 'Other' : friendlyName(name),
-              ]}
+              formatter={(v: number, name: string) => {
+                if (viewMode === 'categories') {
+                  const cat = CATEGORIES.find((c) => c.id === name)
+                  return [formatDuration(v * 60000), cat ? `${cat.icon} ${cat.label}` : name]
+                }
+                return [formatDuration(v * 60000), name === '__other__' ? 'Other' : friendlyName(name)]
+              }}
             />
-            {topApps.map((app, i) => (
-              <Bar
-                key={app}
-                dataKey={app}
-                stackId="s"
-                fill={COLORS[i % COLORS.length]}
-                radius={!hasOther && i === topApps.length - 1 ? [3, 3, 0, 0] : undefined}
+
+            {viewMode === 'apps' && topApps.map((app, i) => (
+              <Bar key={app} dataKey={app} stackId="s" fill={APP_COLORS[i % APP_COLORS.length]}
+                radius={!hasOtherApps && i === topApps.length - 1 ? [3, 3, 0, 0] : undefined}
               >
-                {chartData.map((entry, j) => (
-                  <Cell
-                    key={j}
-                    fill={COLORS[i % COLORS.length]}
+                {appsChartData.map((entry, j) => (
+                  <Cell key={j} fill={APP_COLORS[i % APP_COLORS.length]}
                     opacity={selectedDay && entry.date !== selectedDay ? 0.2 : 1}
                   />
                 ))}
               </Bar>
             ))}
-            {hasOther && (
-              <Bar dataKey="__other__" stackId="s" fill="#475569" radius={[3, 3, 0, 0]}>
-                {chartData.map((entry, j) => (
-                  <Cell key={j} fill="#475569" opacity={selectedDay && entry.date !== selectedDay ? 0.2 : 1} />
+            {viewMode === 'apps' && hasOtherApps && (
+              <Bar dataKey="__other__" stackId="s" fill="var(--text-4)" radius={[3, 3, 0, 0]}>
+                {appsChartData.map((entry, j) => (
+                  <Cell key={j} fill={isDark ? '#475569' : '#9ca3af'} opacity={selectedDay && entry.date !== selectedDay ? 0.2 : 1} />
                 ))}
               </Bar>
             )}
+
+            {viewMode === 'categories' && activeCats.map((cat, i) => (
+              <Bar key={cat.id} dataKey={cat.id} stackId="s" fill={cat.color}
+                radius={i === activeCats.length - 1 ? [3, 3, 0, 0] : undefined}
+              >
+                {catChartData.map((entry, j) => (
+                  <Cell key={j} fill={cat.color} opacity={selectedDay && entry.date !== selectedDay ? 0.2 : 1} />
+                ))}
+              </Bar>
+            ))}
           </BarChart>
         </ResponsiveContainer>
 
         {/* Legend */}
-        {topApps.length > 0 && (
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '5px 14px', paddingTop: 10, borderTop: '1px solid #2d3148' }}>
-            {topApps.map((app, i) => (
-              <div key={app} style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
-                <div style={{ width: 8, height: 8, borderRadius: 2, background: COLORS[i % COLORS.length], flexShrink: 0 }} />
-                <span style={{ fontSize: 11, color: '#64748b' }}>{friendlyName(app)}</span>
-                <span style={{ fontSize: 11, color: '#475569' }}>{formatDuration(weeklyByApp[app]?.total_ms ?? 0)}</span>
-              </div>
-            ))}
-            {hasOther && (
-              <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
-                <div style={{ width: 8, height: 8, borderRadius: 2, background: '#475569', flexShrink: 0 }} />
-                <span style={{ fontSize: 11, color: '#64748b' }}>Other</span>
-              </div>
-            )}
-          </div>
-        )}
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '5px 14px', paddingTop: 10, borderTop: '1px solid var(--border)' }}>
+          {viewMode === 'apps' ? (
+            <>
+              {topApps.map((app, i) => (
+                <div key={app} style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+                  <div style={{ width: 8, height: 8, borderRadius: 2, background: APP_COLORS[i % APP_COLORS.length], flexShrink: 0 }} />
+                  <span style={{ fontSize: 11, color: 'var(--text-3)' }}>{friendlyName(app)}</span>
+                  <span style={{ fontSize: 11, color: 'var(--text-4)' }}>{formatDuration(weeklyByApp[app]?.total_ms ?? 0)}</span>
+                </div>
+              ))}
+              {hasOtherApps && (
+                <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+                  <div style={{ width: 8, height: 8, borderRadius: 2, background: 'var(--text-4)', flexShrink: 0 }} />
+                  <span style={{ fontSize: 11, color: 'var(--text-3)' }}>Other</span>
+                </div>
+              )}
+            </>
+          ) : (
+            activeCats.map((cat) => {
+              const total = categoryTotals.find((c) => c.id === cat.id)?.totalMs ?? 0
+              return (
+                <div key={cat.id} style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+                  <div style={{ width: 8, height: 8, borderRadius: 2, background: cat.color, flexShrink: 0 }} />
+                  <span style={{ fontSize: 11, color: 'var(--text-3)' }}>{cat.label}</span>
+                  {total > 0 && <span style={{ fontSize: 11, color: 'var(--text-4)' }}>{formatDuration(total)}</span>}
+                </div>
+              )
+            })
+          )}
+        </div>
       </div>
 
       {/* List header */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 4px', marginBottom: 8, flexShrink: 0 }}>
-        <div style={{ background: '#1a1d2e', border: '1px solid #2d3148', borderRadius: 8, padding: 3 }}>
-          <span style={{
-            display: 'inline-block', padding: '4px 12px', borderRadius: 6,
-            background: '#7c8cf8', color: '#fff', fontSize: 12, fontWeight: 600,
-          }}>
-            Apps
-          </span>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+          <span style={{ fontSize: 12, color: 'var(--text-4)', marginRight: 2 }}>Show:</span>
+          <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 8, padding: 3, display: 'flex', gap: 2 }}>
+            <button style={tabStyle(viewMode === 'apps')} onClick={() => setViewMode('apps')}>Apps</button>
+            <button style={tabStyle(viewMode === 'categories')} onClick={() => setViewMode('categories')}>Categories</button>
+          </div>
         </div>
         <div style={{ display: 'flex', gap: 16 }}>
-          <span style={{ fontSize: 11, color: '#374162', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Time</span>
-          <span style={{ fontSize: 11, color: '#374162', textTransform: 'uppercase', letterSpacing: '0.06em', minWidth: 58 }}>Limit</span>
+          <span style={{ fontSize: 11, color: 'var(--border-hi)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Time</span>
+          {viewMode === 'apps' && (
+            <span style={{ fontSize: 11, color: 'var(--border-hi)', textTransform: 'uppercase', letterSpacing: '0.06em', minWidth: 58 }}>Limit</span>
+          )}
         </div>
       </div>
 
-      {/* App list */}
+      {/* List */}
       <div style={{ flex: 1, overflowY: 'auto' }}>
-        {displayList.length === 0 ? (
-          <div style={{ textAlign: 'center', color: '#475569', padding: '32px 0', fontSize: 13 }}>
-            No usage data{selectedDay ? ' for this day' : ' this week'}
-          </div>
-        ) : (
-          <div style={{ background: '#1a1d2e', border: '1px solid #2d3148', borderRadius: 12, overflow: 'hidden' }}>
-            {displayList.map((total, idx) => {
-              const limit = limitMap[total.app_name]
-              const overLimit = !!(limit?.is_enabled && total.total_ms >= limit.limit_ms)
-              const isActive = total.app_name === currentApp
-              const icon = icons[total.exe_path]
-              return (
-                <div
-                  key={total.app_name}
-                  style={{
+        {/* APPS */}
+        {viewMode === 'apps' && (
+          displayList.length === 0 ? (
+            <div style={{ textAlign: 'center', color: 'var(--text-4)', padding: '32px 0', fontSize: 13 }}>
+              No usage data{selectedDay ? ' for this day' : ' this week'}
+            </div>
+          ) : (
+            <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 12, overflow: 'hidden' }}>
+              {displayList.map((total, idx) => {
+                const limit = limitMap[total.app_name]
+                const overLimit = !!(limit?.is_enabled && total.total_ms >= limit.limit_ms)
+                const isActive = total.app_name === currentApp
+                const icon = icons[total.exe_path]
+                return (
+                  <div key={total.app_name} style={{
                     display: 'flex', alignItems: 'center', gap: 12, padding: '11px 16px',
-                    borderBottom: idx < displayList.length - 1 ? '1px solid #1e2133' : 'none',
-                    background: isActive ? 'rgba(124,140,248,0.05)' : 'transparent',
-                  }}
-                >
-                  {icon
-                    ? <img src={icon} width={28} height={28} style={{ borderRadius: 6, flexShrink: 0 }} alt="" />
-                    : <LetterIcon name={total.app_name} size={28} />
-                  }
-                  <div style={{ flex: 1, minWidth: 0, display: 'flex', alignItems: 'center', gap: 6 }}>
-                    {isActive && (
-                      <span style={{
-                        width: 6, height: 6, borderRadius: '50%', background: '#22c55e',
-                        boxShadow: '0 0 5px #22c55e', flexShrink: 0,
-                      }} />
-                    )}
-                    <span style={{
-                      fontSize: 14, color: '#e2e8f0', fontWeight: 500,
-                      overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-                    }}>
-                      {friendlyName(total.app_name)}
-                    </span>
-                  </div>
-                  <span style={{
-                    fontSize: 13, color: '#94a3b8', fontVariantNumeric: 'tabular-nums',
-                    minWidth: 55, textAlign: 'right', flexShrink: 0,
+                    borderBottom: idx < displayList.length - 1 ? '1px solid var(--bg-row)' : 'none',
+                    background: isActive ? 'var(--accent-sub)' : 'transparent',
                   }}>
-                    {formatDuration(total.total_ms)}
-                  </span>
-                  <div style={{ minWidth: 70, textAlign: 'right', flexShrink: 0 }}>
-                    {limit ? (
-                      <span style={{
-                        fontSize: 11, padding: '2px 7px', borderRadius: 10,
-                        background: overLimit ? 'rgba(239,68,68,0.12)' : 'rgba(124,140,248,0.08)',
-                        color: overLimit ? '#ef4444' : '#7c8cf8',
-                      }}>
-                        {overLimit ? 'Limit hit' : `/ ${formatDuration(limit.limit_ms)}`}
+                    {icon
+                      ? <img src={icon} width={28} height={28} style={{ borderRadius: 6, flexShrink: 0 }} alt="" />
+                      : <LetterIcon name={total.app_name} size={28} />
+                    }
+                    <div style={{ flex: 1, minWidth: 0, display: 'flex', alignItems: 'center', gap: 6 }}>
+                      {isActive && <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#22c55e', boxShadow: '0 0 5px #22c55e', flexShrink: 0 }} />}
+                      <span style={{ fontSize: 14, color: 'var(--text-1)', fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        {friendlyName(total.app_name)}
                       </span>
-                    ) : null}
+                    </div>
+                    <span style={{ fontSize: 13, color: 'var(--text-2)', fontVariantNumeric: 'tabular-nums', minWidth: 55, textAlign: 'right', flexShrink: 0 }}>
+                      {formatDuration(total.total_ms)}
+                    </span>
+                    <div style={{ minWidth: 70, textAlign: 'right', flexShrink: 0 }}>
+                      {limit ? (
+                        <span style={{
+                          fontSize: 11, padding: '2px 7px', borderRadius: 10,
+                          background: overLimit ? 'rgba(239,68,68,0.12)' : 'var(--accent-sub)',
+                          color: overLimit ? '#ef4444' : 'var(--accent)',
+                        }}>
+                          {overLimit ? 'Limit hit' : `/ ${formatDuration(limit.limit_ms)}`}
+                        </span>
+                      ) : null}
+                    </div>
                   </div>
+                )
+              })}
+            </div>
+          )
+        )}
+
+        {/* CATEGORIES */}
+        {viewMode === 'categories' && (
+          categoryTotals.length === 0 ? (
+            <div style={{ textAlign: 'center', color: 'var(--text-4)', padding: '32px 0', fontSize: 13 }}>
+              No usage data{selectedDay ? ' for this day' : ' this week'}
+            </div>
+          ) : (
+            <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 12, overflow: 'hidden' }}>
+              {categoryTotals.map((cat, idx) => (
+                <div key={cat.id} style={{
+                  display: 'flex', alignItems: 'center', gap: 12, padding: '12px 16px',
+                  borderBottom: idx < categoryTotals.length - 1 ? '1px solid var(--bg-row)' : 'none',
+                }}>
+                  <div style={{
+                    width: 34, height: 34, borderRadius: 10, flexShrink: 0,
+                    background: cat.color + '22', border: `1.5px solid ${cat.color}44`,
+                    display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 17,
+                  }}>
+                    {cat.icon}
+                  </div>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: 14, color: 'var(--text-1)', fontWeight: 500 }}>{cat.label}</div>
+                    <div style={{ fontSize: 11, color: 'var(--text-4)', marginTop: 1 }}>
+                      {cat.appCount} {cat.appCount === 1 ? 'app' : 'apps'}
+                    </div>
+                  </div>
+                  <span style={{ fontSize: 13, color: 'var(--text-2)', fontVariantNumeric: 'tabular-nums', minWidth: 55, textAlign: 'right', flexShrink: 0 }}>
+                    {formatDuration(cat.totalMs)}
+                  </span>
+                  <div style={{ width: 3, height: 28, borderRadius: 2, background: cat.color, flexShrink: 0, opacity: 0.7 }} />
                 </div>
-              )
-            })}
-          </div>
+              ))}
+            </div>
+          )
         )}
       </div>
     </div>
