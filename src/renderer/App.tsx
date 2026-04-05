@@ -14,8 +14,8 @@ export default function App(): React.ReactElement {
   const updateTodayTotal = useAppStore((s) => s.updateTodayTotal)
 
   useEffect(() => {
-    const unsub = onSessionUpdate(({ appName, todayTotalMs }) => {
-      updateTodayTotal(appName, todayTotalMs)
+    const unsub = onSessionUpdate(({ appName, todayTotalMs, isIdle }) => {
+      updateTodayTotal(appName, todayTotalMs, isIdle ?? false)
     })
     return unsub
   }, [updateTodayTotal])

@@ -52,6 +52,7 @@ export default function DashboardPage(): React.ReactElement {
   const [viewMode, setViewMode] = useState<ViewMode>('apps')
 
   const currentApp = useAppStore((s) => s.currentApp)
+  const isIdle = useAppStore((s) => s.isIdle)
   const liveTotals = useAppStore((s) => s.todayTotals)
   const theme = useAppStore((s) => s.theme)
   const categoryOverrides = useAppStore((s) => s.categoryOverrides)
@@ -424,7 +425,8 @@ export default function DashboardPage(): React.ReactElement {
                       : <LetterIcon name={total.app_name} size={28} />
                     }
                     <div style={{ flex: 1, minWidth: 0, display: 'flex', alignItems: 'center', gap: 6 }}>
-                      {isActive && <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#22c55e', boxShadow: '0 0 5px #22c55e', flexShrink: 0 }} />}
+                      {isActive && !isIdle && <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#22c55e', boxShadow: '0 0 5px #22c55e', flexShrink: 0 }} />}
+                      {isActive && isIdle && <span style={{ width: 6, height: 6, borderRadius: '50%', background: 'var(--text-4)', flexShrink: 0 }} />}
                       <span style={{ fontSize: 14, color: 'var(--text-1)', fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                         {friendlyName(total.app_name)}
                       </span>

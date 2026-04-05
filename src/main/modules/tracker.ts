@@ -1,11 +1,14 @@
 import path from 'path'
-import { BrowserWindow } from 'electron'
+import { BrowserWindow, powerMonitor } from 'electron'
 import { DatabaseWrapper } from '../db/sqljs-wrapper'
 import { getActiveWindow, stopWindowTracker } from '../utils/windowTracker'
 import { todayISO, dateToISO } from '../utils/timeUtils'
 
 const POLL_INTERVAL_MS = 2000
 const FLUSH_INTERVAL_MS = 30000
+
+/** Seconds of no keyboard/mouse input before we stop counting screen time */
+const IDLE_THRESHOLD_SECONDS = 5 * 60  // 5 minutes
 
 interface ActiveSession {
   appName: string
@@ -64,34 +67,44 @@ async function pollActiveWindow(): Promise<void> {
       info.name.toLowerCase().includes('electron')
     ) return
 
+    // ── Idle detection ──────────────────────────────────────────────────────
+    // If the user hasn't touched keyboard or mouse for IDLE_THRESHOLD_SECONDS,
+    // don't count this time against any app.
+    const idleSeconds = powerMonitor.getSystemIdleTime()
+    const isIdle = idleSeconds >= IDLE_THRESHOLD_SECONDS
+
     const newAppName = info.name  // already has .exe from windowTracker
     const newExePath = info.path
     const newTitle = info.title
     const newPid = info.pid
 
     if (!currentSession) {
-      beginSession(newAppName, newExePath, newTitle, newPid, now)
+      if (!isIdle) beginSession(newAppName, newExePath, newTitle, newPid, now)
       return
     }
 
     if (newAppName.toLowerCase() !== currentSession.appName.toLowerCase()) {
       flushAndEndSession(now)
       currentSession = null
-      beginSession(newAppName, newExePath, newTitle, newPid, now)
+      if (!isIdle) beginSession(newAppName, newExePath, newTitle, newPid, now)
       return
     }
 
-    // Same app still in foreground
+    // Same app still in foreground — only accumulate when the user is active.
+    // Always advance lastTickTime so the idle gap is never counted on return.
     const delta = now - currentSession.lastTickTime
-    currentSession.accumulatedMs += delta
     currentSession.lastTickTime = now
     currentSession.windowTitle = newTitle
+
+    if (!isIdle) {
+      currentSession.accumulatedMs += delta
+    }
 
     if (now - currentSession.lastFlushTime >= FLUSH_INTERVAL_MS) {
       flushSession(now)
     }
 
-    sendSessionUpdate()
+    sendSessionUpdate(isIdle)
   } catch (err) {
     console.error('[tracker] poll error:', err)
   }
@@ -170,7 +183,7 @@ function flushAndEndSession(now: number): void {
   )
 }
 
-function sendSessionUpdate(): void {
+function sendSessionUpdate(isIdle = false): void {
   if (!mainWindow || mainWindow.isDestroyed()) return
   if (!db || !currentSession) return
 
@@ -183,6 +196,7 @@ function sendSessionUpdate(): void {
 
   mainWindow.webContents.send('tracker:session-update', {
     appName: currentSession.appName,
-    todayTotalMs
+    todayTotalMs,
+    isIdle,
   })
 }
