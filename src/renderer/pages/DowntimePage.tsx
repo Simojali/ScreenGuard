@@ -1,10 +1,11 @@
-import React, { useState } from 'react'
-import { Plus, Trash2, Edit2 } from 'lucide-react'
+import React, { useState, useEffect } from 'react'
+import { Plus, Trash2, Edit2, FolderOpen, X } from 'lucide-react'
 import { useDowntime } from '../hooks/useDowntime'
 import { ipc } from '../lib/ipcClient'
+import { friendlyName } from '../lib/appNames'
 import Toggle from '../components/shared/Toggle'
 import Modal from '../components/shared/Modal'
-import type { DowntimeRule } from '../types'
+import type { DowntimeRule, KnownApp } from '../types'
 
 const DAY_LABELS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
 
@@ -12,6 +13,12 @@ function parseDays(json: string): number[] {
   try { return JSON.parse(json) } catch { return [] }
 }
 
+function parseAppliesTo(val: string): string[] | 'all' {
+  if (val === 'all') return 'all'
+  try { return JSON.parse(val) } catch { return 'all' }
+}
+
+// ── Rule editor ──────────────────────────────────────────────────────────────
 function RuleEditor({
   initial, onSave, onClose,
 }: {
@@ -19,13 +26,52 @@ function RuleEditor({
   onSave: (rule: Omit<DowntimeRule, 'id'>) => void
   onClose: () => void
 }): React.ReactElement {
-  const [label, setLabel] = useState(initial?.label ?? '')
-  const [days, setDays] = useState<number[]>(parseDays(initial?.days_of_week ?? '[1,2,3,4,5]'))
+  const [label, setLabel]         = useState(initial?.label ?? '')
+  const [days, setDays]           = useState<number[]>(parseDays(initial?.days_of_week ?? '[1,2,3,4,5]'))
   const [startTime, setStartTime] = useState(initial?.start_time ?? '22:00')
-  const [endTime, setEndTime] = useState(initial?.end_time ?? '07:00')
+  const [endTime, setEndTime]     = useState(initial?.end_time ?? '07:00')
+
+  // applies_to: 'all' or list of app_names
+  const initialApplies = parseAppliesTo(initial?.applies_to ?? 'all')
+  const [blockAll, setBlockAll]         = useState(initialApplies === 'all')
+  const [selectedApps, setSelectedApps] = useState<string[]>(
+    initialApplies === 'all' ? [] : initialApplies
+  )
+  const [knownApps, setKnownApps] = useState<KnownApp[]>([])
+
+  useEffect(() => { ipc.getKnownApps().then(setKnownApps) }, [])
 
   function toggleDay(d: number) {
     setDays((prev) => prev.includes(d) ? prev.filter((x) => x !== d) : [...prev, d].sort())
+  }
+
+  function toggleApp(appName: string) {
+    setSelectedApps((prev) =>
+      prev.includes(appName) ? prev.filter((a) => a !== appName) : [...prev, appName]
+    )
+  }
+
+  async function handleBrowse() {
+    const picked = await ipc.pickExe()
+    if (!picked) return
+    if (!knownApps.some((a) => a.app_name === picked.app_name)) {
+      setKnownApps((prev) => [...prev, picked])
+    }
+    setSelectedApps((prev) =>
+      prev.includes(picked.app_name) ? prev : [...prev, picked.app_name]
+    )
+  }
+
+  function handleSave() {
+    const applies_to = blockAll ? 'all' : JSON.stringify(selectedApps)
+    onSave({
+      label,
+      days_of_week: JSON.stringify(days),
+      start_time: startTime,
+      end_time: endTime,
+      is_enabled: 1,
+      applies_to,
+    })
   }
 
   const inputStyle: React.CSSProperties = {
@@ -33,8 +79,11 @@ function RuleEditor({
     borderRadius: 8, color: 'var(--text-1)', padding: '7px 10px', fontSize: 14, width: '100%',
   }
 
+  const canSave = days.length > 0 && (blockAll || selectedApps.length > 0)
+
   return (
     <div>
+      {/* Label */}
       <label style={{ fontSize: 12, color: 'var(--text-2)', display: 'block', marginBottom: 6 }}>Label (optional)</label>
       <input
         style={{ ...inputStyle, marginBottom: 14 }}
@@ -43,6 +92,7 @@ function RuleEditor({
         placeholder="e.g. Bedtime"
       />
 
+      {/* Days */}
       <label style={{ fontSize: 12, color: 'var(--text-2)', display: 'block', marginBottom: 8 }}>Days</label>
       <div style={{ display: 'flex', gap: 6, marginBottom: 16 }}>
         {DAY_LABELS.map((day, i) => (
@@ -62,6 +112,7 @@ function RuleEditor({
         ))}
       </div>
 
+      {/* Time range */}
       <div style={{ display: 'flex', gap: 12, marginBottom: 20 }}>
         <div style={{ flex: 1 }}>
           <label style={{ fontSize: 12, color: 'var(--text-2)', display: 'block', marginBottom: 6 }}>Start</label>
@@ -73,6 +124,125 @@ function RuleEditor({
         </div>
       </div>
 
+      {/* Applies to */}
+      <label style={{ fontSize: 12, color: 'var(--text-2)', display: 'block', marginBottom: 8 }}>Block</label>
+      <div style={{
+        background: 'var(--bg-row)', border: '1px solid var(--border-hi)',
+        borderRadius: 10, overflow: 'hidden', marginBottom: 20,
+      }}>
+        {/* All apps toggle */}
+        <div
+          onClick={() => setBlockAll(true)}
+          style={{
+            display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+            padding: '10px 14px', cursor: 'pointer',
+            borderBottom: '1px solid var(--border)',
+            background: blockAll ? 'var(--accent-sub)' : 'transparent',
+          }}
+        >
+          <div>
+            <div style={{ fontSize: 13, fontWeight: 500, color: 'var(--text-1)' }}>All apps</div>
+            <div style={{ fontSize: 11, color: 'var(--text-4)', marginTop: 1 }}>
+              Block everything during this period
+            </div>
+          </div>
+          <div style={{
+            width: 16, height: 16, borderRadius: '50%', border: `2px solid ${blockAll ? 'var(--accent)' : 'var(--border-hi)'}`,
+            background: blockAll ? 'var(--accent)' : 'transparent', flexShrink: 0,
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+          }}>
+            {blockAll && <div style={{ width: 6, height: 6, borderRadius: '50%', background: '#fff' }} />}
+          </div>
+        </div>
+
+        {/* Specific apps */}
+        <div
+          onClick={() => setBlockAll(false)}
+          style={{
+            display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+            padding: '10px 14px', cursor: 'pointer',
+            background: !blockAll ? 'var(--accent-sub)' : 'transparent',
+          }}
+        >
+          <div>
+            <div style={{ fontSize: 13, fontWeight: 500, color: 'var(--text-1)' }}>Specific apps</div>
+            <div style={{ fontSize: 11, color: 'var(--text-4)', marginTop: 1 }}>
+              Choose which apps to block
+            </div>
+          </div>
+          <div style={{
+            width: 16, height: 16, borderRadius: '50%', border: `2px solid ${!blockAll ? 'var(--accent)' : 'var(--border-hi)'}`,
+            background: !blockAll ? 'var(--accent)' : 'transparent', flexShrink: 0,
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+          }}>
+            {!blockAll && <div style={{ width: 6, height: 6, borderRadius: '50%', background: '#fff' }} />}
+          </div>
+        </div>
+
+        {/* App picker — shown when specific mode */}
+        {!blockAll && (
+          <div style={{ padding: '10px 14px', borderTop: '1px solid var(--border)' }}>
+            {/* Currently selected apps */}
+            {selectedApps.length > 0 && (
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 10 }}>
+                {selectedApps.map((appName) => (
+                  <div key={appName} style={{
+                    display: 'flex', alignItems: 'center', gap: 5,
+                    background: 'var(--bg-card)', border: '1px solid var(--border-hi)',
+                    borderRadius: 20, padding: '3px 8px 3px 10px', fontSize: 12, color: 'var(--text-2)',
+                  }}>
+                    {friendlyName(appName)}
+                    <button
+                      onClick={(e) => { e.stopPropagation(); toggleApp(appName) }}
+                      style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-4)', padding: 0, display: 'flex', lineHeight: 1 }}
+                    >
+                      <X size={12} />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* Tracked apps dropdown */}
+            <select
+              value=""
+              onChange={(e) => { if (e.target.value) toggleApp(e.target.value) }}
+              style={{
+                width: '100%', background: 'var(--bg-card)', border: '1px solid var(--border-hi)',
+                borderRadius: 7, color: selectedApps.length === 0 ? 'var(--text-3)' : 'var(--text-1)',
+                padding: '7px 10px', fontSize: 13, marginBottom: 8,
+              }}
+            >
+              <option value="">Add a tracked app…</option>
+              {knownApps
+                .filter((a) => !selectedApps.includes(a.app_name))
+                .map((a) => (
+                  <option key={a.app_name} value={a.app_name}>{friendlyName(a.app_name)}</option>
+                ))}
+            </select>
+
+            {/* Browse button */}
+            <button
+              onClick={handleBrowse}
+              style={{
+                display: 'flex', alignItems: 'center', gap: 6, width: '100%',
+                background: 'none', border: '1px dashed var(--border-hi)', borderRadius: 7,
+                color: 'var(--text-3)', padding: '6px 10px', cursor: 'pointer', fontSize: 12,
+              }}
+            >
+              <FolderOpen size={13} /> Browse for app…
+            </button>
+
+            {selectedApps.length === 0 && (
+              <div style={{ fontSize: 11, color: '#ef4444', marginTop: 8 }}>
+                Select at least one app to block.
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+
+      {/* Actions */}
       <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
         <button
           onClick={onClose}
@@ -81,9 +251,13 @@ function RuleEditor({
           Cancel
         </button>
         <button
-          onClick={() => onSave({ label, days_of_week: JSON.stringify(days), start_time: startTime, end_time: endTime, is_enabled: 1, applies_to: 'all' })}
-          disabled={days.length === 0}
-          style={{ padding: '8px 16px', borderRadius: 8, background: 'var(--accent)', color: '#fff', border: 'none', cursor: 'pointer', fontSize: 13, fontWeight: 500 }}
+          onClick={handleSave}
+          disabled={!canSave}
+          style={{
+            padding: '8px 16px', borderRadius: 8, background: 'var(--accent)', color: '#fff',
+            border: 'none', cursor: canSave ? 'pointer' : 'default', fontSize: 13, fontWeight: 500,
+            opacity: canSave ? 1 : 0.5,
+          }}
         >
           Save Rule
         </button>
@@ -92,6 +266,7 @@ function RuleEditor({
   )
 }
 
+// ── Page ─────────────────────────────────────────────────────────────────────
 export default function DowntimePage(): React.ReactElement {
   const { rules, loading, refresh } = useDowntime()
   const [modal, setModal] = useState<'create' | { edit: DowntimeRule } | null>(null)
@@ -141,12 +316,13 @@ export default function DowntimePage(): React.ReactElement {
         <div style={{ textAlign: 'center', color: 'var(--text-3)', marginTop: 60, fontSize: 14, lineHeight: 1.8 }}>
           <div style={{ fontSize: 32, marginBottom: 12 }}>🌙</div>
           No downtime rules yet.<br />
-          Schedule blocks of time when apps should be closed automatically.
+          Schedule blocks of time to automatically close specific apps.
         </div>
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
           {rules.map((rule) => {
             const days = parseDays(rule.days_of_week)
+            const appliesTo = parseAppliesTo(rule.applies_to)
             return (
               <div key={rule.id} style={{
                 background: 'var(--bg-card)', border: '1px solid var(--border)',
@@ -161,7 +337,7 @@ export default function DowntimePage(): React.ReactElement {
                       {rule.start_time} – {rule.end_time}
                     </span>
                   </div>
-                  <div style={{ display: 'flex', gap: 4 }}>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 4 }}>
                     {DAY_LABELS.map((day, i) => (
                       <span key={i} style={{
                         fontSize: 11, padding: '1px 6px', borderRadius: 4,
@@ -169,6 +345,14 @@ export default function DowntimePage(): React.ReactElement {
                         color: days.includes(i) ? 'var(--accent)' : 'var(--border-hi)',
                       }}>{day}</span>
                     ))}
+                    <span style={{ fontSize: 11, color: 'var(--text-4)', margin: '0 4px' }}>·</span>
+                    {appliesTo === 'all' ? (
+                      <span style={{ fontSize: 11, color: 'var(--text-3)' }}>All apps</span>
+                    ) : (
+                      <span style={{ fontSize: 11, color: 'var(--text-3)' }}>
+                        {appliesTo.map((a) => friendlyName(a)).join(', ')}
+                      </span>
+                    )}
                   </div>
                 </div>
                 <Toggle checked={rule.is_enabled === 1} onChange={(v) => handleToggle(rule, v)} />
