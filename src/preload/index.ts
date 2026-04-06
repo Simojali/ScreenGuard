@@ -88,6 +88,10 @@ const api = {
   resetCategoryLabel: (categoryId: string): Promise<{ success: boolean }> =>
     ipcRenderer.invoke('categories:reset-label', { categoryId }),
 
+  // File picker
+  pickExe: (): Promise<{ app_name: string; exe_path: string } | null> =>
+    ipcRenderer.invoke('dialog:pick-exe'),
+
   // Settings
   getSettings: (): Promise<Record<string, string>> =>
     ipcRenderer.invoke('settings:get-all'),

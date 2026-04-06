@@ -1,4 +1,4 @@
-import { ipcMain, app } from 'electron'
+import { ipcMain, app, dialog } from 'electron'
 import path from 'path'
 import fs from 'fs'
 import { DatabaseWrapper } from '../db/sqljs-wrapper'
@@ -151,6 +151,20 @@ export function initIpcHandlers(db: DatabaseWrapper): void {
     const session = getCurrentSession()
     if (!session) return null
     return { appName: session.appName, exePath: session.exePath }
+  })
+
+  // ─── File picker ──────────────────────────────────────────────────────────
+
+  ipcMain.handle('dialog:pick-exe', async () => {
+    const result = await dialog.showOpenDialog({
+      title: 'Select Application',
+      filters: [{ name: 'Executable', extensions: ['exe'] }],
+      properties: ['openFile'],
+    })
+    if (result.canceled || result.filePaths.length === 0) return null
+    const exePath = result.filePaths[0]
+    const appName = path.basename(exePath) // e.g. "WhatsApp.exe"
+    return { app_name: appName, exe_path: exePath }
   })
 
   // ─── App icons ────────────────────────────────────────────────────────────

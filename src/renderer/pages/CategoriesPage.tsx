@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react'
-import { RotateCcw, Plus, X, GripVertical, Check, Pencil } from 'lucide-react'
+import { RotateCcw, Plus, X, GripVertical, Check, Pencil, FolderOpen } from 'lucide-react'
 import { ipc } from '../lib/ipcClient'
 import { CATEGORIES, getCategoryId, resolveCategoryId, resolveLabel } from '../lib/categories'
 import { friendlyName } from '../lib/appNames'
@@ -295,33 +295,55 @@ export default function CategoriesPage(): React.ReactElement {
               {/* ── Add app ── */}
               <div style={{ padding: '8px 16px', borderTop: apps.length > 0 ? '1px solid var(--border)' : undefined }}>
                 {isAddingHere ? (
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                    <select
-                      autoFocus
-                      defaultValue=""
-                      onChange={async (e) => {
-                        if (e.target.value) {
-                          await moveApp(e.target.value, cat.id)
-                          setAddingTo(null)
-                        }
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <select
+                        autoFocus
+                        defaultValue=""
+                        onChange={async (e) => {
+                          if (e.target.value) {
+                            await moveApp(e.target.value, cat.id)
+                            setAddingTo(null)
+                          }
+                        }}
+                        style={{
+                          flex: 1, background: 'var(--bg-row)', border: '1px solid var(--border-hi)',
+                          borderRadius: 7, color: 'var(--text-1)', padding: '6px 8px', fontSize: 13,
+                        }}
+                      >
+                        <option value="" disabled>Select a tracked app…</option>
+                        {appsNotInCat(cat.id).map((a) => (
+                          <option key={a.app_name} value={a.app_name}>
+                            {friendlyName(a.app_name)}
+                          </option>
+                        ))}
+                      </select>
+                      <button
+                        onClick={() => setAddingTo(null)}
+                        style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-4)', display: 'flex' }}
+                      >
+                        <X size={14} />
+                      </button>
+                    </div>
+                    {/* Browse button */}
+                    <button
+                      onClick={async () => {
+                        const picked = await ipc.pickExe()
+                        if (!picked) return
+                        // Add to knownApps if not already tracked
+                        setKnownApps((prev) =>
+                          prev.some((a) => a.app_name === picked.app_name) ? prev : [...prev, picked]
+                        )
+                        await moveApp(picked.app_name, cat.id)
+                        setAddingTo(null)
                       }}
                       style={{
-                        flex: 1, background: 'var(--bg-row)', border: '1px solid var(--border-hi)',
-                        borderRadius: 7, color: 'var(--text-1)', padding: '6px 8px', fontSize: 13,
+                        display: 'flex', alignItems: 'center', gap: 6,
+                        background: 'none', border: '1px dashed var(--border-hi)', borderRadius: 7,
+                        color: 'var(--text-3)', padding: '5px 10px', cursor: 'pointer', fontSize: 12,
                       }}
                     >
-                      <option value="" disabled>Select an app…</option>
-                      {appsNotInCat(cat.id).map((a) => (
-                        <option key={a.app_name} value={a.app_name}>
-                          {friendlyName(a.app_name)}
-                        </option>
-                      ))}
-                    </select>
-                    <button
-                      onClick={() => setAddingTo(null)}
-                      style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-4)', display: 'flex' }}
-                    >
-                      <X size={14} />
+                      <FolderOpen size={13} /> Browse for app…
                     </button>
                   </div>
                 ) : (

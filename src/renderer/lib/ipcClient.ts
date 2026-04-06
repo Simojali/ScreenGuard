@@ -48,6 +48,9 @@ export const ipc = {
   resetCategoryLabel: (categoryId: string) =>
     invoke<{ success: boolean }>('resetCategoryLabel', categoryId),
 
+  // File picker
+  pickExe: () => invoke<{ app_name: string; exe_path: string } | null>('pickExe'),
+
   // Settings
   getSettings: () => invoke<Record<string, string>>('getSettings'),
   setSetting: (key: string, value: string) => invoke<{ success: boolean }>('setSetting', key, value),

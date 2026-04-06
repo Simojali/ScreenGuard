@@ -1,5 +1,5 @@
 import React, { useState } from 'react'
-import { Plus, Trash2 } from 'lucide-react'
+import { Plus, Trash2, FolderOpen } from 'lucide-react'
 import { useLimits } from '../hooks/useLimits'
 import { ipc } from '../lib/ipcClient'
 import { friendlyName } from '../lib/appNames'
@@ -112,7 +112,7 @@ export default function LimitsPage(): React.ReactElement {
               <select
                 style={{
                   width: '100%', background: 'var(--bg-row)', border: '1px solid var(--border-hi)',
-                  borderRadius: 8, color: 'var(--text-1)', padding: '8px 10px', fontSize: 14, marginBottom: 16,
+                  borderRadius: 8, color: 'var(--text-1)', padding: '8px 10px', fontSize: 14,
                 }}
                 value={selectedApp?.app_name ?? ''}
                 onChange={(e) => setSelectedApp(knownApps.find((a) => a.app_name === e.target.value) ?? null)}
@@ -122,10 +122,35 @@ export default function LimitsPage(): React.ReactElement {
                 ))}
               </select>
             ) : (
-              <div style={{ fontSize: 13, color: 'var(--text-3)', marginBottom: 16 }}>
-                No apps tracked yet. Use your computer for a bit first.
+              <div style={{ fontSize: 13, color: 'var(--text-3)' }}>
+                No apps tracked yet. Use your computer for a bit, or browse manually below.
               </div>
             )}
+            {/* Manual browse */}
+            <button
+              onClick={async () => {
+                const picked = await ipc.pickExe()
+                if (!picked) return
+                setSelectedApp(picked)
+                // Add to local list if not already present
+                setKnownApps((prev) =>
+                  prev.some((a) => a.app_name === picked.app_name) ? prev : [...prev, picked]
+                )
+              }}
+              style={{
+                display: 'flex', alignItems: 'center', gap: 6, marginTop: 8, marginBottom: 16,
+                background: 'none', border: '1px dashed var(--border-hi)', borderRadius: 8,
+                color: 'var(--text-3)', padding: '7px 12px', cursor: 'pointer', fontSize: 13, width: '100%',
+              }}
+            >
+              <FolderOpen size={14} />
+              Browse for app…
+              {selectedApp && !knownApps.slice(0, -1).some((a) => a.app_name === selectedApp.app_name) && (
+                <span style={{ marginLeft: 'auto', color: 'var(--accent)', fontSize: 12 }}>
+                  {friendlyName(selectedApp.app_name)}
+                </span>
+              )}
+            </button>
 
             <label style={{ fontSize: 12, color: 'var(--text-2)', display: 'block', marginBottom: 8 }}>Daily Limit</label>
             <DurationInput valueMs={limitMs} onChange={setLimitMs} />
