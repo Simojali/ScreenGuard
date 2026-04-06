@@ -4,6 +4,7 @@ import { initDatabase } from './db/database'
 import { startTracker, stopTracker, setIdleConfig } from './modules/tracker'
 import { startLimiter, stopLimiter } from './modules/limiter'
 import { startDowntime, stopDowntime } from './modules/downtime'
+import { startReminders, stopReminders } from './modules/reminders'
 import { setupTray } from './modules/tray'
 import { initIpcHandlers } from './ipc/handlers'
 
@@ -65,6 +66,7 @@ app.whenReady().then(async () => {
   startTracker(db, mainWindow)
   startLimiter(db, mainWindow)
   startDowntime(db)
+  startReminders(db)
 
   // Handle system suspend/resume
   powerMonitor.on('suspend', () => {
@@ -80,6 +82,7 @@ app.on('before-quit', () => {
   stopTracker()
   stopLimiter()
   stopDowntime()
+  stopReminders()
 })
 
 // Prevent quitting when all windows close — live in tray instead

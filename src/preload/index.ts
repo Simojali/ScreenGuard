@@ -104,6 +104,18 @@ const api = {
   clearHistory: (): Promise<{ success: boolean }> =>
     ipcRenderer.invoke('settings:clear-history'),
 
+  // Reminders
+  getReminders: (): Promise<{ id: number; label: string; app_name: string; threshold_ms: number; is_enabled: number }[]> =>
+    ipcRenderer.invoke('reminders:get-all'),
+  createReminder: (r: { label: string; app_name: string; threshold_ms: number }): Promise<{ id: number }> =>
+    ipcRenderer.invoke('reminders:create', r),
+  updateReminder: (r: { id: number; label: string; app_name: string; threshold_ms: number; is_enabled: number }): Promise<{ success: boolean }> =>
+    ipcRenderer.invoke('reminders:update', r),
+  deleteReminder: (id: number): Promise<{ success: boolean }> =>
+    ipcRenderer.invoke('reminders:delete', { id }),
+  toggleReminder: (id: number, isEnabled: boolean): Promise<{ success: boolean }> =>
+    ipcRenderer.invoke('reminders:toggle', { id, isEnabled }),
+
   // Push event listeners
   onSessionUpdate: (
     callback: (data: { appName: string; todayTotalMs: number; isIdle: boolean }) => void

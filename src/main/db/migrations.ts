@@ -80,5 +80,16 @@ export const migrations = [
     ('idle_enabled', 'true'),
     ('idle_threshold_minutes', '5'),
     ('launch_at_startup', 'false');
+  `,
+
+  // v4 — reminders
+  `
+  CREATE TABLE IF NOT EXISTS reminders (
+    id           INTEGER PRIMARY KEY AUTOINCREMENT,
+    label        TEXT    NOT NULL DEFAULT '',
+    app_name     TEXT    NOT NULL DEFAULT 'all',
+    threshold_ms INTEGER NOT NULL,
+    is_enabled   INTEGER NOT NULL DEFAULT 1
+  );
   `
 ]

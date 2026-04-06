@@ -7,6 +7,7 @@ import ReportsPage from './pages/ReportsPage'
 import LimitsPage from './pages/LimitsPage'
 import DowntimePage from './pages/DowntimePage'
 import CategoriesPage from './pages/CategoriesPage'
+import RemindersPage from './pages/RemindersPage'
 import SettingsPage from './pages/SettingsPage'
 import { onSessionUpdate } from './lib/ipcClient'
 import { useAppStore } from './store/appStore'
@@ -33,6 +34,7 @@ export default function App(): React.ReactElement {
               <Route path="/reports" element={<ReportsPage />} />
               <Route path="/limits" element={<LimitsPage />} />
               <Route path="/downtime" element={<DowntimePage />} />
+              <Route path="/reminders" element={<RemindersPage />} />
               <Route path="/categories" element={<CategoriesPage />} />
               <Route path="/settings" element={<SettingsPage />} />
             </Routes>

@@ -23,3 +23,15 @@ export function sendDowntimeNotification(appName: string): void {
     silent: false
   }).show()
 }
+
+export function sendReminderNotification(label: string, appName: string, thresholdMs: number): void {
+  const h = Math.floor(thresholdMs / 3600000)
+  const m = Math.floor((thresholdMs % 3600000) / 60000)
+  const timeStr = h > 0 ? `${h}h${m > 0 ? ` ${m}m` : ''}` : `${m}m`
+  const target = appName === 'all' ? 'all apps' : appName.replace(/\.exe$/i, '')
+  new Notification({
+    title: label || 'Screen Time Reminder',
+    body: `You've spent ${timeStr} on ${target} today.`,
+    silent: false,
+  }).show()
+}

@@ -51,6 +51,16 @@ export const ipc = {
   // File picker
   pickExe: () => invoke<{ app_name: string; exe_path: string } | null>('pickExe'),
 
+  // Reminders
+  getReminders: () => invoke<import('../types').Reminder[]>('getReminders'),
+  createReminder: (r: { label: string; app_name: string; threshold_ms: number }) =>
+    invoke<{ id: number }>('createReminder', r),
+  updateReminder: (r: import('../types').Reminder) =>
+    invoke<{ success: boolean }>('updateReminder', r),
+  deleteReminder: (id: number) => invoke<{ success: boolean }>('deleteReminder', id),
+  toggleReminder: (id: number, isEnabled: boolean) =>
+    invoke<{ success: boolean }>('toggleReminder', id, isEnabled),
+
   // Settings
   getSettings: () => invoke<Record<string, string>>('getSettings'),
   setSetting: (key: string, value: string) => invoke<{ success: boolean }>('setSetting', key, value),

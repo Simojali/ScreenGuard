@@ -32,3 +32,11 @@ export type KnownApp = {
   app_name: string
   exe_path: string
 }
+
+export type Reminder = {
+  id: number
+  label: string
+  app_name: string   // 'all' or specific app name
+  threshold_ms: number
+  is_enabled: number
+}

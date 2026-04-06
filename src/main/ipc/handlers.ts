@@ -291,4 +291,34 @@ export function initIpcHandlers(db: DatabaseWrapper): void {
     db.prepare('DELETE FROM usage_sessions').run()
     return { success: true }
   })
+
+  // ─── Reminders ────────────────────────────────────────────────────────────
+
+  ipcMain.handle('reminders:get-all', () => {
+    return db.prepare('SELECT * FROM reminders ORDER BY id').all()
+  })
+
+  ipcMain.handle('reminders:create', (_event, r: { label: string; app_name: string; threshold_ms: number }) => {
+    const result = db.prepare(
+      `INSERT INTO reminders (label, app_name, threshold_ms, is_enabled) VALUES (?, ?, ?, 1)`
+    ).run(r.label, r.app_name, r.threshold_ms)
+    return { id: result.lastInsertRowid }
+  })
+
+  ipcMain.handle('reminders:update', (_event, r: { id: number; label: string; app_name: string; threshold_ms: number; is_enabled: number }) => {
+    db.prepare(
+      `UPDATE reminders SET label=?, app_name=?, threshold_ms=?, is_enabled=? WHERE id=?`
+    ).run(r.label, r.app_name, r.threshold_ms, r.is_enabled, r.id)
+    return { success: true }
+  })
+
+  ipcMain.handle('reminders:delete', (_event, { id }: { id: number }) => {
+    db.prepare('DELETE FROM reminders WHERE id = ?').run(id)
+    return { success: true }
+  })
+
+  ipcMain.handle('reminders:toggle', (_event, { id, isEnabled }: { id: number; isEnabled: boolean }) => {
+    db.prepare('UPDATE reminders SET is_enabled = ? WHERE id = ?').run(isEnabled ? 1 : 0, id)
+    return { success: true }
+  })
 }
