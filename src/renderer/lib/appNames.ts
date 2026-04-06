@@ -1,5 +1,8 @@
 /** Maps process names (lowercase, no .exe, no UWP suffixes) to human-friendly display names */
 const KNOWN_NAMES: Record<string, string> = {
+  // This app (production name + dev mode)
+  'screenguard': 'ScreenGuard',
+  'electron': 'ScreenGuard',
   // Browsers
   'chrome': 'Google Chrome',
   'firefox': 'Firefox',
@@ -106,6 +109,18 @@ const KNOWN_NAMES: Record<string, string> = {
  * - Strips common UWP package suffixes (.Root, .Desktop, .App)
  * - Looks up the known-names map, falling back to the cleaned name.
  */
+/**
+ * Returns true if the given app_name refers to ScreenGuard itself.
+ * Used to prevent the app from appearing in Limits / Downtime / Reminders pickers.
+ */
+export function isSelfApp(appName: string): boolean {
+  const base = appName
+    .toLowerCase()
+    .replace(/\.exe$/i, '')
+    .replace(/\.(root|desktop|app)$/i, '')
+  return base === 'electron' || base === 'screenguard'
+}
+
 export function friendlyName(appName: string): string {
   // Strip .exe
   let name = appName.replace(/\.exe$/i, '')

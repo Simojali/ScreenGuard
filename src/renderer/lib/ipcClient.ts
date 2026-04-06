@@ -83,3 +83,9 @@ export function onLimitBreach(cb: BreachCallback): () => void {
   if (rawApi?.onLimitBreach) return rawApi.onLimitBreach(cb)
   return () => {}
 }
+
+export function onDayChanged(cb: () => void): () => void {
+  const rawApi = (window as typeof window & { api: { onDayChanged?: (cb: () => void) => () => void } }).api
+  if (rawApi?.onDayChanged) return rawApi.onDayChanged(cb)
+  return () => {}
+}

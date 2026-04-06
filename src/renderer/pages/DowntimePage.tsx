@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react'
 import { Plus, Trash2, Edit2, FolderOpen, X } from 'lucide-react'
 import { useDowntime } from '../hooks/useDowntime'
 import { ipc } from '../lib/ipcClient'
-import { friendlyName } from '../lib/appNames'
+import { friendlyName, isSelfApp } from '../lib/appNames'
 import Toggle from '../components/shared/Toggle'
 import Modal from '../components/shared/Modal'
 import type { DowntimeRule, KnownApp } from '../types'
@@ -39,7 +39,9 @@ function RuleEditor({
   )
   const [knownApps, setKnownApps] = useState<KnownApp[]>([])
 
-  useEffect(() => { ipc.getKnownApps().then(setKnownApps) }, [])
+  useEffect(() => {
+    ipc.getKnownApps().then((apps) => setKnownApps(apps.filter((a) => !isSelfApp(a.app_name))))
+  }, [])
 
   function toggleDay(d: number) {
     setDays((prev) => prev.includes(d) ? prev.filter((x) => x !== d) : [...prev, d].sort())
@@ -53,7 +55,7 @@ function RuleEditor({
 
   async function handleBrowse() {
     const picked = await ipc.pickExe()
-    if (!picked) return
+    if (!picked || isSelfApp(picked.app_name)) return
     if (!knownApps.some((a) => a.app_name === picked.app_name)) {
       setKnownApps((prev) => [...prev, picked])
     }

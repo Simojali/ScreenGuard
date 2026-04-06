@@ -13,6 +13,7 @@ interface AppState {
   setCurrentApp: (appName: string | null) => void
   updateTodayTotal: (appName: string, totalMs: number, isIdle: boolean) => void
   setTodayTotals: (totals: DailyTotal[]) => void
+  resetTodayTotals: () => void
   toggleTheme: () => void
   setCategoryOverrides: (overrides: Record<string, string>) => void
   setCategoryLabels: (labels: Record<string, string>) => void
@@ -47,6 +48,8 @@ export const useAppStore = create<AppState>((set) => ({
     for (const t of totals) map[t.app_name] = t.total_ms
     set({ todayTotals: map })
   },
+
+  resetTodayTotals: () => set({ todayTotals: {}, currentApp: null, isIdle: false }),
 
   toggleTheme: () =>
     set((state) => {

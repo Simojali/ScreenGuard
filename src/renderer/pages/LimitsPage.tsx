@@ -2,7 +2,7 @@ import React, { useState } from 'react'
 import { Plus, Trash2, FolderOpen } from 'lucide-react'
 import { useLimits } from '../hooks/useLimits'
 import { ipc } from '../lib/ipcClient'
-import { friendlyName } from '../lib/appNames'
+import { friendlyName, isSelfApp } from '../lib/appNames'
 import Toggle from '../components/shared/Toggle'
 import Modal from '../components/shared/Modal'
 import DurationInput from '../components/shared/DurationInput'
@@ -23,7 +23,7 @@ export default function LimitsPage(): React.ReactElement {
   const [limitMs, setLimitMs] = useState(3600000)
 
   async function openModal() {
-    const apps = await ipc.getKnownApps()
+    const apps = (await ipc.getKnownApps()).filter((a) => !isSelfApp(a.app_name))
     setKnownApps(apps)
     setSelectedApp(apps[0] ?? null)
     setLimitMs(3600000)
@@ -130,7 +130,7 @@ export default function LimitsPage(): React.ReactElement {
             <button
               onClick={async () => {
                 const picked = await ipc.pickExe()
-                if (!picked) return
+                if (!picked || isSelfApp(picked.app_name)) return
                 setSelectedApp(picked)
                 // Add to local list if not already present
                 setKnownApps((prev) =>

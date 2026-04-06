@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react'
 import { Plus, Trash2, Edit2, Bell, FolderOpen } from 'lucide-react'
 import { ipc } from '../lib/ipcClient'
-import { friendlyName } from '../lib/appNames'
+import { friendlyName, isSelfApp } from '../lib/appNames'
 import Toggle from '../components/shared/Toggle'
 import Modal from '../components/shared/Modal'
 import DurationInput from '../components/shared/DurationInput'
@@ -31,11 +31,13 @@ function ReminderEditor({
   const [knownApps, setKnownApps]   = useState<KnownApp[]>([])
   const [allApps, setAllApps]       = useState(initial?.app_name === undefined || initial?.app_name === 'all')
 
-  useEffect(() => { ipc.getKnownApps().then(setKnownApps) }, [])
+  useEffect(() => {
+    ipc.getKnownApps().then((apps) => setKnownApps(apps.filter((a) => !isSelfApp(a.app_name))))
+  }, [])
 
   async function handleBrowse() {
     const picked = await ipc.pickExe()
-    if (!picked) return
+    if (!picked || isSelfApp(picked.app_name)) return
     if (!knownApps.some((a) => a.app_name === picked.app_name)) {
       setKnownApps((prev) => [...prev, picked])
     }

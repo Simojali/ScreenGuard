@@ -131,6 +131,12 @@ const api = {
       callback(data)
     ipcRenderer.on('limit:breach', handler)
     return () => ipcRenderer.removeListener('limit:breach', handler)
+  },
+
+  onDayChanged: (callback: () => void) => {
+    const handler = () => callback()
+    ipcRenderer.on('tracker:day-changed', handler)
+    return () => ipcRenderer.removeListener('tracker:day-changed', handler)
   }
 }
 

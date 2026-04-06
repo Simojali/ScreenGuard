@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react'
 import { ChevronLeft, ChevronRight } from 'lucide-react'
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from 'recharts'
-import { ipc } from '../lib/ipcClient'
+import { ipc, onDayChanged } from '../lib/ipcClient'
 import { dateToISO } from '../lib/dateUtils'
 import { friendlyName } from '../lib/appNames'
 import { CATEGORIES, resolveCategoryId, resolveLabel } from '../lib/categories'
@@ -57,8 +57,36 @@ export default function DashboardPage(): React.ReactElement {
   const theme = useAppStore((s) => s.theme)
   const categoryOverrides = useAppStore((s) => s.categoryOverrides)
   const categoryLabels = useAppStore((s) => s.categoryLabels)
+  const resetTodayTotals = useAppStore((s) => s.resetTodayTotals)
   const { limits } = useLimits()
-  const today = dateToISO(new Date())
+
+  // 'today' is kept as state so it updates when the calendar day changes
+  const [today, setToday] = useState<string>(() => dateToISO(new Date()))
+
+  // ── Day rollover ────────────────────────────────────────────────────────────
+  // 1. Listen for the main-process 'tracker:day-changed' event (fires right at midnight)
+  // 2. Poll every 30 s as a fallback (cheap string compare)
+  useEffect(() => {
+    function handleNewDay(): void {
+      const newDay = dateToISO(new Date())
+      setToday(newDay)
+      resetTodayTotals()
+      setWeekStart(mondayOf(new Date()))
+    }
+    const unsub = onDayChanged(handleNewDay)
+    const timer = setInterval(() => {
+      const newDay = dateToISO(new Date())
+      setToday((prev) => {
+        if (prev !== newDay) {
+          resetTodayTotals()
+          setWeekStart(mondayOf(new Date()))
+          return newDay
+        }
+        return prev
+      })
+    }, 30_000)
+    return () => { unsub(); clearInterval(timer) }
+  }, [resetTodayTotals])
 
   useEffect(() => {
     ipc.getWeekly(dateToISO(weekStart)).then((r) => {

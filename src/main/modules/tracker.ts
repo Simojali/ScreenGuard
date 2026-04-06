@@ -1,4 +1,3 @@
-import path from 'path'
 import { BrowserWindow, powerMonitor } from 'electron'
 import { DatabaseWrapper } from '../db/sqljs-wrapper'
 import { getActiveWindow, stopWindowTracker } from '../utils/windowTracker'
@@ -66,15 +65,6 @@ async function pollActiveWindow(): Promise<void> {
 
     if (!info || !info.path) return
 
-    // Skip our own Electron process
-    const selfExe = path.basename(process.execPath).toLowerCase()
-    const infoExe = path.basename(info.path || info.name).toLowerCase()
-    if (
-      infoExe === selfExe ||
-      infoExe === 'electron.exe' ||
-      info.name.toLowerCase().includes('electron')
-    ) return
-
     // ── Idle detection ──────────────────────────────────────────────────────
     // If the user hasn't touched keyboard or mouse for IDLE_THRESHOLD_SECONDS,
     // don't count this time against any app.
@@ -85,6 +75,17 @@ async function pollActiveWindow(): Promise<void> {
     const newExePath = info.path
     const newTitle = info.title
     const newPid = info.pid
+
+    // ── Midnight rollover ────────────────────────────────────────────────────
+    // If the active session started on a different calendar day, split it at
+    // midnight so old-day time goes to the old date and new-day time goes to today.
+    if (currentSession) {
+      const sessionDate = dateToISO(new Date(currentSession.startTime))
+      if (sessionDate !== todayISO()) {
+        handleMidnightRollover(now, isIdle)
+        return
+      }
+    }
 
     if (!currentSession) {
       if (!isIdle) beginSession(newAppName, newExePath, newTitle, newPid, now)
@@ -189,6 +190,57 @@ function flushAndEndSession(now: number): void {
     totalMs,
     currentSession.sessionId
   )
+}
+
+/**
+ * Called when a session is found to have started on yesterday (or earlier).
+ * Flushes accumulated time to the old date, closes the old DB session at
+ * midnight, then starts a fresh session for the new calendar day.
+ */
+function handleMidnightRollover(now: number, isIdle: boolean): void {
+  if (!db || !currentSession) return
+
+  // 00:00:00.000 of the current calendar day (local time)
+  const midnight = new Date()
+  midnight.setHours(0, 0, 0, 0)
+  const midnightMs = midnight.getTime()
+
+  // Flush whatever was accumulated before midnight to the OLD date
+  const oldDate = dateToISO(new Date(currentSession.startTime))
+  if (currentSession.accumulatedMs > 0) {
+    db.prepare(
+      `INSERT INTO daily_totals (date, app_name, exe_path, total_ms)
+       VALUES (?, ?, ?, ?)
+       ON CONFLICT(date, app_name) DO UPDATE SET total_ms = total_ms + excluded.total_ms`
+    ).run(oldDate, currentSession.appName, currentSession.exePath, currentSession.accumulatedMs)
+  }
+
+  // Close the old session record at midnight
+  db.prepare(`UPDATE usage_sessions SET ended_at = ?, duration_ms = ? WHERE id = ?`).run(
+    midnightMs,
+    currentSession.accumulatedMs,
+    currentSession.sessionId
+  )
+
+  const { appName, exePath, windowTitle, pid } = currentSession
+  currentSession = null
+
+  // Tell the renderer the day has changed so it can refresh its display
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    mainWindow.webContents.send('tracker:day-changed')
+  }
+
+  // Start a fresh session for the new day beginning at midnight
+  if (!isIdle) {
+    beginSession(appName, exePath, windowTitle, pid, midnightMs)
+    if (currentSession) {
+      // Credit any time that has elapsed since midnight to today
+      currentSession.accumulatedMs = Math.max(0, now - midnightMs)
+      currentSession.lastTickTime = now
+      currentSession.lastFlushTime = midnightMs
+      sendSessionUpdate(false)
+    }
+  }
 }
 
 function sendSessionUpdate(isIdle = false): void {
