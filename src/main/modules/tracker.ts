@@ -171,7 +171,10 @@ function flushSession(now: number): void {
 function flushAndEndSession(now: number): void {
   if (!db || !currentSession) return
 
-  const remaining = now - currentSession.lastFlushTime
+  // Use lastTickTime (not lastFlushTime) to avoid double-counting.
+  // accumulatedMs is already built up tick-by-tick up to lastTickTime;
+  // we only need to capture the tiny gap from the last tick to now.
+  const remaining = Math.max(0, now - currentSession.lastTickTime)
   if (remaining > 0) currentSession.accumulatedMs += remaining
 
   const totalMs = currentSession.accumulatedMs

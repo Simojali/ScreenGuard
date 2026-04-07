@@ -194,6 +194,17 @@ export default function DashboardPage(): React.ReactElement {
     })
   }, [weekStart, today])
 
+  // ── Periodic report refresh ─────────────────────────────────────────────────
+  // Re-fetch the weekly DB snapshot every 30 s so that apps that ended a
+  // session (were switched away from) show up-to-date totals.  The initial
+  // fetch above already handles navigation; this keeps live data accurate.
+  useEffect(() => {
+    const timer = setInterval(() => {
+      ipc.getWeekly(dateToISO(weekStart)).then((r) => setReport(r))
+    }, 30_000)
+    return () => clearInterval(timer)
+  }, [weekStart])
+
   const limitMap = useMemo<Record<string, AppLimit>>(() => {
     const m: Record<string, AppLimit> = {}
     for (const l of limits) m[l.app_name] = l
