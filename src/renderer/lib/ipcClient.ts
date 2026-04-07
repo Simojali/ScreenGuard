@@ -14,6 +14,8 @@ export const ipc = {
   getToday: (date?: string) => invoke<import('../types').DailyTotal[]>('getToday', date),
   getWeekly: (weekStartDate: string) => invoke<import('../types').WeeklyReport>('getWeekly', weekStartDate)
     .then(r => (r && typeof r === 'object' && 'dates' in r) ? r : { dates: [], byDate: {} }),
+  getRange: (startDate: string, endDate: string) =>
+    invoke<import('../types').DailyTotal[]>('getRange', startDate, endDate),
   getKnownApps: () => invoke<import('../types').KnownApp[]>('getKnownApps'),
   getLimits: () => invoke<import('../types').AppLimit[]>('getLimits'),
   setLimit: (appName: string, exePath: string, limitMs: number) =>

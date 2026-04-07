@@ -15,6 +15,17 @@ interface DailyTotal {
 export function initIpcHandlers(db: DatabaseWrapper): void {
   // ─── Usage ───────────────────────────────────────────────────────────────
 
+  // Returns per-app totals aggregated over any date range (for month view etc.)
+  ipcMain.handle('usage:get-range', (_event, { startDate, endDate }: { startDate: string; endDate: string }) => {
+    return db.prepare(
+      `SELECT app_name, exe_path, SUM(total_ms) as total_ms
+       FROM daily_totals
+       WHERE date >= ? AND date <= ?
+       GROUP BY app_name, exe_path
+       ORDER BY total_ms DESC`
+    ).all(startDate, endDate)
+  })
+
   ipcMain.handle('usage:get-today', (_event, { date }: { date?: string } = {}) => {
     const target = date ?? todayISO()
     return db.prepare('SELECT * FROM daily_totals WHERE date = ? ORDER BY total_ms DESC').all(target)

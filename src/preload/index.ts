@@ -41,6 +41,8 @@ const api = {
     ipcRenderer.invoke('usage:get-today', { date }),
   getWeekly: (weekStartDate: string): Promise<WeeklyReport> =>
     ipcRenderer.invoke('usage:get-weekly', { weekStartDate }),
+  getRange: (startDate: string, endDate: string): Promise<DailyTotal[]> =>
+    ipcRenderer.invoke('usage:get-range', { startDate, endDate }),
 
   // Apps
   getKnownApps: (): Promise<KnownApp[]> => ipcRenderer.invoke('apps:get-known'),
